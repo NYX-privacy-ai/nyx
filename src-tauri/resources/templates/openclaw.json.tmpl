@@ -1,0 +1,34 @@
+{
+  "version": "2026.2.9",
+  "agent": {
+    "name": "Nyx",
+    "model": "claude-sonnet-4-20250514"
+  },
+  "tools": {
+    "profile": "coding",
+    "deny": ["group:ui"],
+    "exec": {
+      "host": "gateway",
+      "ask": "off",
+      "security": "full",
+      "safeBins": ["gog", "ls", "find", "wc", "date", "openclaw", "curl", "cat", "grep", "head", "tail"]
+    }
+  },
+  "sandbox": {
+    "mode": "off"
+  },
+  "web": {
+    "enabled": true
+  },
+  "cron": {
+    "enabled": true,
+    "maxConcurrentRuns": 1
+  },
+  "skills": {
+    "allowLocal": true
+  },
+  "plugins": {
+    "entries": {}
+  },
+  "channels": {}
+}

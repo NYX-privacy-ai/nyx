@@ -1,0 +1,88 @@
+{
+  "version": 2,
+  "jobs": [
+    {
+      "name": "Nyx Heartbeat",
+      "schedule": {
+        "kind": "every",
+        "everyMs": 14400000
+      },
+      "sessionTarget": "isolated",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "Run the Nyx DeFi heartbeat check. Use the near-intents skill to execute: /opt/near-intents-helper/run_near_intents.sh heartbeat --risk medium\n\nIf any actions were taken or errors occurred, send me a brief summary on WhatsApp. If everything is stable and no actions were needed, stay silent (don't message me)."
+      },
+      "state": {
+        "nextRunAtMs": null
+      },
+      "enabled": true,
+      "delivery": {
+        "mode": "announce",
+        "channel": "whatsapp"
+      }
+    },
+    {
+      "name": "Daily DeFi Report",
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 9 * * *",
+        "tz": "Europe/London"
+      },
+      "sessionTarget": "isolated",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "Generate and send the daily Nyx DeFi report. Use the near-intents skill to execute: /opt/near-intents-helper/run_near_intents.sh daily-report\n\nFormat the results into a clear, concise message with:\n- Portfolio value and daily P&L\n- Any active positions (staking, lending)\n- Top yield opportunities\n- Trading status (active or halted)\n- Any alerts or warnings\n\nKeep it brief and readable on a phone screen."
+      },
+      "state": {
+        "nextRunAtMs": null
+      },
+      "enabled": true,
+      "delivery": {
+        "mode": "announce",
+        "channel": "whatsapp"
+      }
+    },
+    {
+      "name": "Hourly Email Triage",
+      "schedule": {
+        "kind": "cron",
+        "expr": "0 8-22 * * *",
+        "tz": "Europe/London"
+      },
+      "sessionTarget": "isolated",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "Quick email triage — scan for high-priority emails across all configured accounts.\n\nFor EACH account, run:\n  gog gmail search 'newer_than:1h is:unread' --max 20\n  gog gmail search 'newer_than:1h is:unread' --max 20 --account chris@g3p.io\n  gog gmail search 'newer_than:1h is:unread' --max 20 --account chris@comp.xyz\n\nClassify each unread email as:\n- 🔴 URGENT — needs immediate attention (time-sensitive, from key contacts, financial, legal, security)\n- 🟡 IMPORTANT — should be addressed today (client comms, scheduled items, action required)\n- ⚪ NORMAL — can wait (newsletters, notifications, FYI)\n\nONLY message me if there are 🔴 URGENT emails. Include:\n- Sender, subject, one-line summary\n- Why it's urgent\n- Suggested action\n\nIf nothing urgent, stay silent. Do NOT send a message saying 'nothing urgent'."
+      },
+      "state": {
+        "nextRunAtMs": null
+      },
+      "enabled": true,
+      "delivery": {
+        "mode": "announce",
+        "channel": "whatsapp"
+      }
+    },
+    {
+      "name": "Daily Email Digest",
+      "schedule": {
+        "kind": "cron",
+        "expr": "30 8 * * *",
+        "tz": "Europe/London"
+      },
+      "sessionTarget": "isolated",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "Generate the daily email digest — a comprehensive inbox summary across all accounts.\n\nFor EACH account, run:\n  gog gmail search 'newer_than:24h' --max 50\n  gog gmail search 'newer_than:24h' --max 50 --account chris@g3p.io\n  gog gmail search 'newer_than:24h' --max 50 --account chris@comp.xyz\n\nProduce a concise digest grouped by priority:\n\n🔴 URGENT (needs action NOW)\n- [sender] subject — one-line summary + suggested action\n\n🟡 IMPORTANT (action today)\n- [sender] subject — one-line summary\n\n📊 STATS\n- Total new emails (per account)\n- Unread count\n- Threads awaiting your reply\n\nSkip newsletters, automated notifications, and low-priority items unless there's an unusual spike. Keep it scannable on a phone screen.\n\nAlways send this digest even if nothing urgent — it's the morning briefing."
+      },
+      "state": {
+        "nextRunAtMs": null
+      },
+      "enabled": true,
+      "delivery": {
+        "mode": "announce",
+        "channel": "whatsapp"
+      }
+    }
+  ]
+}

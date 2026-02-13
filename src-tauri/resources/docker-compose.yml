@@ -1,0 +1,99 @@
+services:
+  openclaw-gateway:
+    image: ghcr.io/openclaw/openclaw:2026.2.9
+    container_name: openclaw-gateway
+    restart: unless-stopped
+    init: true
+    ports:
+      # HARDENED: bind to localhost ONLY — never 0.0.0.0
+      - "127.0.0.1:18789:18789"
+    read_only: true
+    tmpfs:
+      - /tmp:size=100M,noexec,nosuid,nodev
+      - /var/tmp:size=50M,noexec,nosuid,nodev
+      - /run:size=10M,noexec,nosuid,nodev
+    volumes:
+      # Config and state
+      - ${HOME}/.openclaw:/home/node/.openclaw:rw
+      # Agent workspace
+      - ${HOME}/openclaw/workspace:/home/node/.openclaw/workspace:rw
+      # Local skills — mounted READ-ONLY
+      - ${HOME}/openclaw/local-skills:/home/node/.openclaw/local-skills:ro
+      # NEAR Intents helper — mounted READ-ONLY (the skill invokes this)
+      - ${HOME}/openclaw/near-intents-helper:/opt/near-intents-helper:ro
+      # NOTE: secrets dir NO LONGER mounted — credentials injected via env vars
+      # gogcli binary — mounted READ-ONLY into PATH
+      - ${HOME}/openclaw/bin/gog:/usr/local/bin/gog:ro
+      # gogcli config/token store
+      - ${HOME}/.openclaw/gogcli:/home/node/.config/gogcli:rw
+      # Nyx DeFi state (portfolio, positions, strategy logs)
+      - ${HOME}/.openclaw/defi-state:/home/node/.openclaw/defi-state:rw
+      # PATCH: fix false-positive billing error on wallet balances containing "402"
+      - ${HOME}/openclaw/patches/dist/pi-embedded-helpers-BMVq9N_Q.js:/app/dist/pi-embedded-helpers-BMVq9N_Q.js:ro
+      - ${HOME}/openclaw/patches/dist/pi-embedded-helpers-BirxUQcw.js:/app/dist/pi-embedded-helpers-BirxUQcw.js:ro
+      - ${HOME}/openclaw/patches/dist/pi-embedded-helpers-CCNP0B92.js:/app/dist/pi-embedded-helpers-CCNP0B92.js:ro
+      - ${HOME}/openclaw/patches/dist/pi-embedded-helpers-CZRIUwLy.js:/app/dist/pi-embedded-helpers-CZRIUwLy.js:ro
+    env_file:
+      - docker.env
+    environment:
+      - OPENCLAW_GATEWAY_BIND=localhost
+      - OPENCLAW_CONFIG_PATH=/home/node/.openclaw/openclaw.json
+      # Cross-chain support
+      - CROSS_CHAIN_ENABLED=true
+      - ONECLICK_API_URL=https://1click.chaindefuser.com/v0
+      # Privacy: ZEC as default crypto layer
+      - ZEC_PRIVACY_DEFAULT=true
+    command: ["node", "dist/index.js", "gateway", "--bind", "loopback", "--port", "18789"]
+    user: "1000:1000"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    mem_limit: 2g
+    cpus: 2
+    pids_limit: 256
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
+    networks:
+      - openclaw-net
+
+  openclaw-cli:
+    image: ghcr.io/openclaw/openclaw:2026.2.9
+    container_name: openclaw-cli
+    profiles: ["cli"]
+    stdin_open: true
+    tty: true
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp:size=100M,noexec,nosuid,nodev
+    volumes:
+      - ${HOME}/.openclaw:/home/node/.openclaw:rw
+      - ${HOME}/openclaw/workspace:/home/node/.openclaw/workspace:rw
+      - ${HOME}/openclaw/local-skills:/home/node/.openclaw/local-skills:ro
+      - ${HOME}/openclaw/near-intents-helper:/opt/near-intents-helper:ro
+      - ${HOME}/openclaw/bin/gog:/usr/local/bin/gog:ro
+      - ${HOME}/.openclaw/gogcli:/home/node/.config/gogcli:rw
+      - ${HOME}/.openclaw/defi-state:/home/node/.openclaw/defi-state:rw
+      # PATCH: fix false-positive billing error on wallet balances containing "402"
+      - ${HOME}/openclaw/patches/dist/pi-embedded-helpers-BMVq9N_Q.js:/app/dist/pi-embedded-helpers-BMVq9N_Q.js:ro
+      - ${HOME}/openclaw/patches/dist/pi-embedded-helpers-BirxUQcw.js:/app/dist/pi-embedded-helpers-BirxUQcw.js:ro
+      - ${HOME}/openclaw/patches/dist/pi-embedded-helpers-CCNP0B92.js:/app/dist/pi-embedded-helpers-CCNP0B92.js:ro
+      - ${HOME}/openclaw/patches/dist/pi-embedded-helpers-CZRIUwLy.js:/app/dist/pi-embedded-helpers-CZRIUwLy.js:ro
+    env_file:
+      - docker.env
+    environment:
+      - OPENCLAW_CONFIG_PATH=/home/node/.openclaw/openclaw.json
+    entrypoint: ["node", "dist/index.js"]
+    user: "1000:1000"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    networks:
+      - openclaw-net
+
+networks:
+  openclaw-net:
+    driver: bridge

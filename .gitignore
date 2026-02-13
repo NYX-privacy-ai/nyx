@@ -1,0 +1,48 @@
+# Dependencies
+node_modules/
+
+# Build artifacts
+build/
+.svelte-kit/
+src-tauri/target/
+
+# Tauri bundles
+*.app
+*.dmg
+*.deb
+*.rpm
+*.AppImage
+
+# Environment & secrets
+.env
+*.env
+docker.env
+!src-tauri/resources/templates/*.env.tmpl
+
+# macOS
+.DS_Store
+**/.DS_Store
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+/tmp/
+
+# Secrets (never commit)
+*.pem
+*.key
+near_account.json
+function_call_keys.json
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Claude Code sessions
+.claude/
