@@ -15,7 +15,7 @@ Thanks for your interest in contributing to Nyx! This document covers the develo
 
 ```bash
 # Clone the repo
-git clone https://github.com/macsco80/nyx.git
+git clone https://github.com/NYX-privacy-ai/nyx.git
 cd nyx
 
 # Install frontend dependencies

@@ -43,7 +43,7 @@ jobs:
           tagName: v__VERSION__
           releaseName: 'Nyx v__VERSION__'
           releaseBody: |
-            See the [changelog](https://github.com/macsco80/nyx/blob/main/CHANGELOG.md) for details.
+            See the [changelog](https://github.com/NYX-privacy-ai/nyx/blob/main/CHANGELOG.md) for details.
           releaseDraft: false
           prerelease: false
           args: --target aarch64-apple-darwin
@@ -80,7 +80,7 @@ jobs:
           tagName: v__VERSION__
           releaseName: 'Nyx v__VERSION__'
           releaseBody: |
-            See the [changelog](https://github.com/macsco80/nyx/blob/main/CHANGELOG.md) for details.
+            See the [changelog](https://github.com/NYX-privacy-ai/nyx/blob/main/CHANGELOG.md) for details.
           releaseDraft: false
           prerelease: false
           args: --target x86_64-apple-darwin

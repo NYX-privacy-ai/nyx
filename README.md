@@ -10,8 +10,8 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/macsco80/nyx/releases/latest">
-    <img src="https://img.shields.io/github/v/release/macsco80/nyx?style=flat-square&color=6366F1" alt="Latest Release" />
+  <a href="https://github.com/NYX-privacy-ai/nyx/releases/latest">
+    <img src="https://img.shields.io/github/v/release/NYX-privacy-ai/nyx?style=flat-square&color=6366F1" alt="Latest Release" />
   </a>
   <img src="https://img.shields.io/badge/platform-macOS%2012%2B-000?style=flat-square" alt="Platform" />
   <img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="License" />
@@ -62,13 +62,13 @@ Everything runs locally. Your data never leaves your machine unless you explicit
 
 ### Download the App
 
-Grab the latest `.dmg` from the [Releases](https://github.com/macsco80/nyx/releases/latest) page, mount it, and drag Nyx to your Applications folder.
+Grab the latest `.dmg` from the [Releases](https://github.com/NYX-privacy-ai/nyx/releases/latest) page, mount it, and drag Nyx to your Applications folder.
 
 ### Build from Source
 
 ```bash
 # Clone the repository
-git clone https://github.com/macsco80/nyx.git
+git clone https://github.com/NYX-privacy-ai/nyx.git
 cd nyx
 
 # Install frontend dependencies
