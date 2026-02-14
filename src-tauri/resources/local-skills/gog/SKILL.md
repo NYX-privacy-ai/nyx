@@ -9,10 +9,9 @@ You have access to `gog`, a CLI tool for the full Google Workspace suite: Gmail,
 
 ## Accounts
 
-Three Google accounts are configured:
-- **christopher.donovan@macsco80.com** (default — used when no `--account` flag)
-- **chris@g3p.io** (use `--account chris@g3p.io`)
-- **chris@comp.xyz** (use `--account chris@comp.xyz`)
+Google accounts are configured during setup. Use `gog accounts list` to see available accounts.
+- The **default account** is used when no `--account` flag is provided
+- Additional accounts can be targeted with `--account user@example.com`
 
 ## Calendar Commands
 
@@ -23,8 +22,8 @@ gog calendar list
 # List events for a date range
 gog calendar events primary --from 2026-02-08T00:00:00Z --to 2026-02-15T00:00:00Z
 
-# List events for second account
-gog calendar events primary --from 2026-02-08T00:00:00Z --to 2026-02-15T00:00:00Z --account chris@g3p.io
+# List events for a specific account
+gog calendar events primary --from 2026-02-08T00:00:00Z --to 2026-02-15T00:00:00Z --account user@example.com
 
 # Create an event
 gog calendar create primary --summary "Meeting title" --from 2026-02-10T14:00:00Z --to 2026-02-10T15:00:00Z
@@ -54,8 +53,7 @@ Hi,
 
 This is the message body.
 
-Best,
-Chris
+Best regards
 EOF
 
 # Reply to a message
@@ -72,7 +70,7 @@ gog gmail drafts create --to recipient@example.com --subject "Draft" --body "Con
 gog docs create "Document Title"
 
 # Create in a specific account
-gog docs create "Document Title" --account chris@g3p.io
+gog docs create "Document Title" --account user@example.com
 
 # Get doc info
 gog docs info <docId>
@@ -167,8 +165,7 @@ gog drive url <fileId>
 - Always confirm with the user before sending emails or creating/modifying calendar events
 - When the user specifies which Google account to use, pass `--account <email>`
 - Use `--json` flag when you need to parse output programmatically
-- The default account is christopher.donovan@macsco80.com
-- For chris@g3p.io, always pass `--account chris@g3p.io`
+- Use `gog accounts list` to see which accounts are configured
 - Use `primary` as the calendarId for the main calendar
 - After creating a Doc/Sheet/Slides, use `gog drive url <id>` to get the shareable link
 - For multi-step document creation (e.g., creating a doc then populating it), create first then use the returned ID for subsequent operations
