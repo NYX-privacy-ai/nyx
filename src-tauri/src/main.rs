@@ -440,9 +440,10 @@ fn clawdtalk_configure(api_key: String) -> Result<(), String> {
     // Get agent name for config
     let agent_name = get_agent_name().ok();
 
-    // Write skill-config.json with env var reference
+    // Write skill-config.json with actual API key (shell scripts use jq to
+    // read this file and cannot resolve ${ENV_VAR} references)
     clawdtalk::write_config(
-        "${CLAWDTALK_API_KEY}",
+        &api_key,
         None, // Owner name auto-detected at runtime
         agent_name.as_deref(),
     )?;

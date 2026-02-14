@@ -895,6 +895,18 @@ pub fn write_openclaw_config(config: &SetupConfig) -> Result<(), String> {
         safe_bins.push("/opt/near-intents-helper/run_near_intents.sh");
     }
 
+    // ClawdTalk voice — add jq + shell scripts to safeBins when configured
+    if caps.communications {
+        let clawdtalk_config = home.join("openclaw/local-skills/clawdtalk/skill-config.json");
+        if clawdtalk_config.exists() {
+            safe_bins.push("jq");
+            safe_bins.push("/home/node/.openclaw/local-skills/clawdtalk/scripts/connect.sh");
+            safe_bins.push("/home/node/.openclaw/local-skills/clawdtalk/scripts/call.sh");
+            safe_bins.push("/home/node/.openclaw/local-skills/clawdtalk/scripts/sms.sh");
+            safe_bins.push("/home/node/.openclaw/local-skills/clawdtalk/scripts/missions.sh");
+        }
+    }
+
     let mut allow_bundled: Vec<&str> = vec![];
     if caps.google_workspace {
         allow_bundled.push("gog");
@@ -906,6 +918,12 @@ pub fn write_openclaw_config(config: &SetupConfig) -> Result<(), String> {
     }
     if caps.travel {
         skill_entries.insert("travel".to_string(), json!({ "enabled": true }));
+    }
+    if caps.communications {
+        let clawdtalk_config = home.join("openclaw/local-skills/clawdtalk/skill-config.json");
+        if clawdtalk_config.exists() {
+            skill_entries.insert("clawdtalk-client".to_string(), json!({ "enabled": true }));
+        }
     }
 
     // Build LLM provider configuration
@@ -1172,6 +1190,20 @@ pub fn copy_resources(resources_dir: &Path) -> Result<(), String> {
             use std::os::unix::fs::PermissionsExt;
             fs::set_permissions(&gog_dst, fs::Permissions::from_mode(0o755))
                 .map_err(|e| format!("Failed to set gog permissions: {}", e))?;
+        }
+    }
+
+    // Copy jq binary (needed by ClawdTalk shell scripts inside Docker container)
+    let jq_src = resources_dir.join("bin/jq");
+    let jq_dst = home.join("openclaw/bin/jq");
+    if jq_src.exists() {
+        fs::copy(&jq_src, &jq_dst)
+            .map_err(|e| format!("Failed to copy jq: {}", e))?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            fs::set_permissions(&jq_dst, fs::Permissions::from_mode(0o755))
+                .map_err(|e| format!("Failed to set jq permissions: {}", e))?;
         }
     }
 

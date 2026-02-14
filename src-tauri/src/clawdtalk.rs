@@ -115,7 +115,9 @@ fn check_process_running() -> (bool, Option<u32>) {
 // Configuration
 // ---------------------------------------------------------------------------
 
-/// Write ClawdTalk skill-config.json with env var reference for API key.
+/// Write ClawdTalk skill-config.json with the actual API key value.
+/// Shell scripts (call.sh, sms.sh etc.) read this via jq and cannot resolve
+/// env var references, so the raw key must be written directly.
 pub fn write_config(api_key_ref: &str, owner_name: Option<&str>, agent_name: Option<&str>) -> Result<(), String> {
     let dir = skill_dir();
     fs::create_dir_all(&dir)
@@ -141,7 +143,7 @@ pub fn write_config(api_key_ref: &str, owner_name: Option<&str>, agent_name: Opt
     fs::write(config_path(), content)
         .map_err(|e| format!("Failed to write config: {}", e))?;
 
-    // chmod 600 on config file (contains env var reference, defence in depth)
+    // chmod 600 on config file (contains API key)
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;

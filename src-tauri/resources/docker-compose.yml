@@ -19,11 +19,15 @@ services:
       - ${HOME}/openclaw/workspace:/home/node/.openclaw/workspace:rw
       # Local skills — mounted READ-ONLY
       - ${HOME}/openclaw/local-skills:/home/node/.openclaw/local-skills:ro
+      # ClawdTalk needs RW for PID files, logs, and node_modules
+      - ${HOME}/openclaw/local-skills/clawdtalk:/home/node/.openclaw/local-skills/clawdtalk:rw
       # NEAR Intents helper — mounted READ-ONLY (the skill invokes this)
       - ${HOME}/openclaw/near-intents-helper:/opt/near-intents-helper:ro
       # NOTE: secrets dir NO LONGER mounted — credentials injected via env vars
       # gogcli binary — mounted READ-ONLY into PATH
       - ${HOME}/openclaw/bin/gog:/usr/local/bin/gog:ro
+      # jq binary — needed by ClawdTalk shell scripts
+      - ${HOME}/openclaw/bin/jq:/usr/local/bin/jq:ro
       # gogcli config/token store
       - ${HOME}/.openclaw/gogcli:/home/node/.config/gogcli:rw
       # Nyx DeFi state (portfolio, positions, strategy logs)
@@ -72,8 +76,10 @@ services:
       - ${HOME}/.openclaw:/home/node/.openclaw:rw
       - ${HOME}/openclaw/workspace:/home/node/.openclaw/workspace:rw
       - ${HOME}/openclaw/local-skills:/home/node/.openclaw/local-skills:ro
+      - ${HOME}/openclaw/local-skills/clawdtalk:/home/node/.openclaw/local-skills/clawdtalk:rw
       - ${HOME}/openclaw/near-intents-helper:/opt/near-intents-helper:ro
       - ${HOME}/openclaw/bin/gog:/usr/local/bin/gog:ro
+      - ${HOME}/openclaw/bin/jq:/usr/local/bin/jq:ro
       - ${HOME}/.openclaw/gogcli:/home/node/.config/gogcli:rw
       - ${HOME}/.openclaw/defi-state:/home/node/.openclaw/defi-state:rw
       # PATCH: fix false-positive billing error on wallet balances containing "402"
