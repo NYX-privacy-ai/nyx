@@ -263,6 +263,8 @@
   let telegramToken = $state('');
   let slackToken = $state('');
   let whatsappPhone = $state('');
+  let clawdtalkKey = $state('');
+  let clawdtalkEnabled = $state(false);
   let defaultLlmProvider = $state<'anthropic' | 'venice' | 'openai' | 'nearai' | 'ollama'>('anthropic');
 
   // Validation states
@@ -580,6 +582,17 @@
           ollama_model: defaultLlmProvider === 'ollama' ? (selectedOllamaModel || null) : null,
         },
       });
+
+      // Configure ClawdTalk voice calling if API key was provided
+      if (clawdtalkEnabled && clawdtalkKey) {
+        provisionStatus = 'Configuring voice calling...';
+        try {
+          await invoke('clawdtalk_configure', { apiKey: clawdtalkKey });
+        } catch {
+          // Non-blocking — voice is optional
+          console.warn('ClawdTalk configuration failed — can be set up later in Settings');
+        }
+      }
 
       provisionStatus = 'Setup complete!';
       setTimeout(() => {
@@ -1193,10 +1206,81 @@
           {/if}
         </div>
 
-        <!-- ─── Section 4: DeFi Security Preset ─── -->
+        <!-- ─── Section 4: Voice Calling (optional) ─── -->
         <div>
           <p class="text-ivory-muted text-xs tracking-wider uppercase mb-3 flex items-center gap-2">
             <span class="w-5 h-5 rounded-full bg-gold/20 text-gold text-[10px] flex items-center justify-center font-bold">4</span>
+            Voice Calling
+            <span class="text-ivory-muted/30 text-[10px] normal-case tracking-normal ml-1">Optional</span>
+          </p>
+          <p class="text-ivory-muted/40 text-xs mb-3">Let your agent make and receive phone calls via ClawdTalk. Can be configured later in Settings.</p>
+
+          <!-- Enable toggle -->
+          <div class="flex items-center justify-between px-3 py-2.5 rounded-lg bg-surface border border-border/50 mb-3">
+            <div class="flex items-center gap-3">
+              <div class="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 {clawdtalkEnabled ? 'bg-gold/15 text-gold' : 'bg-ivory-muted/10 text-ivory-muted'}">
+                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                  <path d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 01-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z" />
+                </svg>
+              </div>
+              <div class="min-w-0">
+                <div class="text-ivory text-xs font-medium">ClawdTalk Voice</div>
+                <div class="text-ivory-muted/50 text-[10px]">Phone calls via Telnyx cloud telephony</div>
+              </div>
+            </div>
+            <button
+              onclick={() => clawdtalkEnabled = !clawdtalkEnabled}
+              class="relative w-10 h-5 rounded-full transition-colors duration-200 flex-shrink-0 overflow-hidden"
+              class:bg-accent={clawdtalkEnabled}
+              class:bg-border={!clawdtalkEnabled}
+            >
+              <span
+                class="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-ivory transition-transform duration-200"
+                style="transform: translateX({clawdtalkEnabled ? '20px' : '0px'})"
+              ></span>
+            </button>
+          </div>
+
+          {#if clawdtalkEnabled}
+            <!-- Privacy warning -->
+            <div class="p-3 rounded-lg border border-warning/20 bg-warning/5 mb-3">
+              <div class="flex items-start gap-2.5">
+                <svg class="w-4 h-4 text-warning flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                  <path d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126z" />
+                  <path d="M12 15.75h.008v.008H12v-.008z" />
+                </svg>
+                <div>
+                  <p class="text-warning text-xs font-medium mb-1">Privacy Notice</p>
+                  <p class="text-ivory-muted/70 text-[10px] leading-relaxed">
+                    Voice calls are processed through Telnyx cloud infrastructure. Your voice audio and agent responses pass through their servers for speech processing. Tool execution and secrets remain local. Never discuss private keys or seed phrases on calls.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <!-- API key input -->
+            <div>
+              <div class="flex items-center justify-between mb-1.5">
+                <label class="text-ivory-muted/70 text-xs">ClawdTalk API Key</label>
+                <button onclick={() => openExternal('https://clawdtalk.com')} class="text-gold-dim hover:text-gold text-xs transition-colors">Get Key</button>
+              </div>
+              <input
+                type="password"
+                bind:value={clawdtalkKey}
+                placeholder="Your ClawdTalk API key"
+                class="w-full bg-surface text-ivory text-sm px-4 py-2.5 rounded border focus:outline-none transition-colors duration-300 selectable {clawdtalkKey.length > 10 ? 'border-positive/50' : 'border-border focus:border-gold-dim'}"
+              />
+              <p class="text-ivory-muted/40 text-[10px] mt-1">
+                Sign up at clawdtalk.com, set up your phone number, then generate an API key.
+              </p>
+            </div>
+          {/if}
+        </div>
+
+        <!-- ─── Section 5: DeFi Security Preset ─── -->
+        <div>
+          <p class="text-ivory-muted text-xs tracking-wider uppercase mb-3 flex items-center gap-2">
+            <span class="w-5 h-5 rounded-full bg-gold/20 text-gold text-[10px] flex items-center justify-center font-bold">5</span>
             DeFi Security
           </p>
           <p class="text-ivory-muted/40 text-xs mb-3">Transaction limits and guardrails for crypto operations. Can be changed later.</p>

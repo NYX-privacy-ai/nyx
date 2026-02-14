@@ -1,6 +1,7 @@
 // Prevents additional console window on Windows in release
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod clawdtalk;
 mod config;
 mod docker;
 mod gateway;
@@ -389,6 +390,103 @@ async fn restart_container() -> Result<(), String> {
 }
 
 // ---------------------------------------------------------------------------
+// ClawdTalk (voice calling)
+// ---------------------------------------------------------------------------
+
+#[tauri::command]
+fn clawdtalk_status() -> Result<clawdtalk::ClawdTalkStatus, String> {
+    clawdtalk::check_status()
+}
+
+#[tauri::command]
+fn clawdtalk_configure(api_key: String) -> Result<(), String> {
+    // Store the raw API key in docker.env, reference via env var in skill config
+    let home = config::home_dir();
+    let env_path = home.join("openclaw/docker.env");
+
+    // Read existing docker.env
+    let content = std::fs::read_to_string(&env_path).unwrap_or_default();
+
+    // Check if CLAWDTALK_API_KEY already exists
+    let has_key = content.lines().any(|l| l.trim().starts_with("CLAWDTALK_API_KEY="));
+
+    let updated = if has_key {
+        // Replace existing line
+        content.lines()
+            .map(|l| {
+                if l.trim().starts_with("CLAWDTALK_API_KEY=") {
+                    format!("CLAWDTALK_API_KEY={}", api_key)
+                } else {
+                    l.to_string()
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+    } else {
+        // Append to end
+        format!("{}\n# ClawdTalk Voice\nCLAWDTALK_API_KEY={}\n", content.trim_end(), api_key)
+    };
+
+    std::fs::write(&env_path, updated)
+        .map_err(|e| format!("Failed to update docker.env: {}", e))?;
+
+    // chmod 600
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = std::fs::set_permissions(&env_path, std::fs::Permissions::from_mode(0o600));
+    }
+
+    // Get agent name for config
+    let agent_name = get_agent_name().ok();
+
+    // Write skill-config.json with env var reference
+    clawdtalk::write_config(
+        "${CLAWDTALK_API_KEY}",
+        None, // Owner name auto-detected at runtime
+        agent_name.as_deref(),
+    )?;
+
+    // Add voice agent to gateway config
+    clawdtalk::configure_gateway_voice_agent()?;
+
+    Ok(())
+}
+
+#[tauri::command]
+fn clawdtalk_remove() -> Result<(), String> {
+    clawdtalk::remove_config()?;
+    clawdtalk::remove_gateway_voice_agent()?;
+
+    // Remove key from docker.env
+    let home = config::home_dir();
+    let env_path = home.join("openclaw/docker.env");
+    if let Ok(content) = std::fs::read_to_string(&env_path) {
+        let updated: Vec<&str> = content.lines()
+            .filter(|l| !l.trim().starts_with("CLAWDTALK_API_KEY=") && l.trim() != "# ClawdTalk Voice")
+            .collect();
+        let _ = std::fs::write(&env_path, updated.join("\n") + "\n");
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
+async fn clawdtalk_start() -> Result<clawdtalk::ClawdTalkStatus, String> {
+    clawdtalk::start_connection().await
+}
+
+#[tauri::command]
+fn clawdtalk_stop() -> Result<clawdtalk::ClawdTalkStatus, String> {
+    clawdtalk::stop_connection()
+}
+
+#[tauri::command]
+fn clawdtalk_logs() -> Result<Vec<String>, String> {
+    clawdtalk::get_logs(20)
+}
+
+// ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 
@@ -456,6 +554,13 @@ fn main() {
             read_current_config,
             save_settings,
             restart_container,
+            // ClawdTalk (voice)
+            clawdtalk_status,
+            clawdtalk_configure,
+            clawdtalk_remove,
+            clawdtalk_start,
+            clawdtalk_stop,
+            clawdtalk_logs,
         ])
         .setup(|app| {
             let handle = app.handle().clone();

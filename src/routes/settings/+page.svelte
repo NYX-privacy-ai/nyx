@@ -74,6 +74,19 @@
   // Docker state
   let dockerStatus = $state('checking');
 
+  // ClawdTalk (voice calling) state
+  let clawdtalkConfigured = $state(false);
+  let clawdtalkConnected = $state(false);
+  let clawdtalkHasKey = $state(false);
+  let clawdtalkServer = $state('https://clawdtalk.com');
+  let clawdtalkPid = $state<number | null>(null);
+  let clawdtalkLogs = $state<string[]>([]);
+  let clawdtalkApiKeyEditing = $state(false);
+  let clawdtalkApiKeyValue = $state('');
+  let clawdtalkSaving = $state(false);
+  let clawdtalkStarting = $state(false);
+  let clawdtalkError = $state('');
+
   // Update state
   let updateAvailable = $state(false);
   let updateVersion = $state('');
@@ -224,6 +237,9 @@
       } catch {
         appVersion = '';
       }
+
+      // Load ClawdTalk status
+      await loadClawdTalkStatus();
 
     } catch (e: any) {
       loadError = e?.toString() || 'Failed to load settings';
@@ -542,6 +558,83 @@
     }
   }
 
+  // ── ClawdTalk voice functions ──
+  async function loadClawdTalkStatus() {
+    try {
+      const { invoke } = await import('@tauri-apps/api/core');
+      const status: any = await invoke('clawdtalk_status');
+      clawdtalkConfigured = status.configured;
+      clawdtalkConnected = status.connected;
+      clawdtalkHasKey = status.has_api_key;
+      clawdtalkServer = status.server;
+      clawdtalkPid = status.pid ?? null;
+      if (status.configured) {
+        try {
+          const logs: string[] = await invoke('clawdtalk_logs');
+          clawdtalkLogs = logs;
+        } catch { /* no logs yet */ }
+      }
+    } catch {
+      // ClawdTalk not available
+    }
+  }
+
+  async function configureClawdTalk(apiKey: string) {
+    clawdtalkSaving = true;
+    clawdtalkError = '';
+    try {
+      const { invoke } = await import('@tauri-apps/api/core');
+      await invoke('clawdtalk_configure', { apiKey });
+      clawdtalkApiKeyEditing = false;
+      clawdtalkApiKeyValue = '';
+      await loadClawdTalkStatus();
+    } catch (e: any) {
+      clawdtalkError = e?.toString() || 'Configuration failed';
+    }
+    clawdtalkSaving = false;
+  }
+
+  async function removeClawdTalk() {
+    clawdtalkError = '';
+    try {
+      const { invoke } = await import('@tauri-apps/api/core');
+      await invoke('clawdtalk_remove');
+      await loadClawdTalkStatus();
+    } catch (e: any) {
+      clawdtalkError = e?.toString() || 'Remove failed';
+    }
+  }
+
+  async function startClawdTalk() {
+    clawdtalkStarting = true;
+    clawdtalkError = '';
+    try {
+      const { invoke } = await import('@tauri-apps/api/core');
+      const status: any = await invoke('clawdtalk_start');
+      clawdtalkConnected = status.connected;
+      clawdtalkPid = status.pid ?? null;
+      if (status.configured) {
+        const logs: string[] = await invoke('clawdtalk_logs');
+        clawdtalkLogs = logs;
+      }
+    } catch (e: any) {
+      clawdtalkError = e?.toString() || 'Start failed';
+    }
+    clawdtalkStarting = false;
+  }
+
+  async function stopClawdTalk() {
+    clawdtalkError = '';
+    try {
+      const { invoke } = await import('@tauri-apps/api/core');
+      const status: any = await invoke('clawdtalk_stop');
+      clawdtalkConnected = status.connected;
+      clawdtalkPid = status.pid ?? null;
+    } catch (e: any) {
+      clawdtalkError = e?.toString() || 'Stop failed';
+    }
+  }
+
   // ── Helper to open URLs ──
   async function openExternal(url: string) {
     try {
@@ -562,6 +655,7 @@
     capabilities: 'M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z',
     update: 'M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3',
     server: 'M21.75 17.25v-.228a4.5 4.5 0 00-.12-1.03l-2.268-9.64a3.375 3.375 0 00-3.285-2.602H7.923a3.375 3.375 0 00-3.285 2.602l-2.268 9.64a4.5 4.5 0 00-.12 1.03v.228m19.5 0a3 3 0 01-3 3H5.25a3 3 0 01-3-3m19.5 0a3 3 0 00-3-3H5.25a3 3 0 00-3 3m16.5 0h.008v.008h-.008v-.008zm-3 0h.008v.008h-.008v-.008z',
+    phone: 'M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 01-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z',
   };
 </script>
 
@@ -968,7 +1062,194 @@
           </div>
         </SettingsSection>
 
-        <!-- ═══════════════ 5. Email Schedule ═══════════════ -->
+        <!-- ═══════════════ 5. Voice Calling (ClawdTalk) ═══════════════ -->
+        <SettingsSection title="Voice Calling" icon={icons.phone}>
+          <div class="space-y-4">
+            <!-- Privacy Warning Banner -->
+            <div class="p-3 rounded-lg border border-warning/20 bg-warning/5">
+              <div class="flex items-start gap-2.5">
+                <svg class="w-4 h-4 text-warning flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                  <path d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126z" />
+                  <path d="M12 15.75h.008v.008H12v-.008z" />
+                </svg>
+                <div>
+                  <p class="text-warning text-xs font-medium mb-1">Privacy Notice</p>
+                  <p class="text-ivory-muted/70 text-[10px] leading-relaxed">
+                    Voice calls are processed through Telnyx cloud infrastructure (ClawdTalk). Your voice audio, transcribed speech, and agent responses pass through their servers for speech-to-text and text-to-speech processing. Tool execution and secrets remain local. Do not discuss private keys, seed phrases, or sensitive credentials on voice calls.
+                  </p>
+                  <button
+                    onclick={() => openExternal('https://clawdtalk.com')}
+                    class="text-gold-dim hover:text-gold text-[10px] mt-1.5 transition-colors"
+                  >
+                    Learn more at clawdtalk.com
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {#if !clawdtalkConfigured}
+              <!-- Not configured: show setup prompt -->
+              <div class="p-4 rounded-lg bg-surface border border-border">
+                <p class="text-ivory text-sm mb-1">Enable voice calling</p>
+                <p class="text-ivory-muted/50 text-xs mb-4">Let your agent make and receive phone calls. Requires a free ClawdTalk API key.</p>
+
+                <div>
+                  <div class="flex items-center justify-between mb-1.5">
+                    <label class="text-ivory-muted text-xs">ClawdTalk API Key</label>
+                    <button
+                      onclick={() => openExternal('https://clawdtalk.com')}
+                      class="flex items-center gap-1 text-gold-dim hover:text-gold text-xs transition-colors"
+                    >
+                      <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+                      </svg>
+                      Get Key
+                    </button>
+                  </div>
+                  <div class="flex gap-2">
+                    <input
+                      type="password"
+                      bind:value={clawdtalkApiKeyValue}
+                      placeholder="Your ClawdTalk API key"
+                      class="flex-1 bg-surface text-ivory text-sm px-4 py-2.5 rounded border border-border focus:border-gold-dim focus:outline-none transition-colors duration-300 selectable"
+                    />
+                    <button
+                      onclick={() => configureClawdTalk(clawdtalkApiKeyValue)}
+                      disabled={!clawdtalkApiKeyValue || clawdtalkSaving}
+                      class="px-4 py-2.5 text-xs tracking-wider uppercase rounded border transition-all duration-200 {clawdtalkApiKeyValue && !clawdtalkSaving ? 'border-gold text-gold hover:bg-gold/10' : 'border-border text-ivory-muted/30 cursor-not-allowed'}"
+                    >
+                      {#if clawdtalkSaving}
+                        <div class="w-4 h-4 border-2 border-gold/40 border-t-gold rounded-full animate-spin"></div>
+                      {:else}
+                        Enable
+                      {/if}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            {:else}
+              <!-- Configured: show status and controls -->
+              <div class="space-y-3">
+                <!-- Connection status -->
+                <div class="flex items-center justify-between px-3 py-2.5 rounded-lg bg-surface border border-border/50">
+                  <div class="flex items-center gap-3">
+                    <div class="w-7 h-7 rounded-lg flex items-center justify-center text-[10px] font-bold flex-shrink-0 {clawdtalkConnected ? 'bg-positive/15 text-positive' : 'bg-ivory-muted/10 text-ivory-muted'}">
+                      <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                        <path d={icons.phone} />
+                      </svg>
+                    </div>
+                    <div class="min-w-0">
+                      <div class="text-ivory text-xs font-medium">Voice Connection</div>
+                      <div class="text-[10px] {clawdtalkConnected ? 'text-positive' : 'text-ivory-muted/50'}">
+                        {clawdtalkConnected ? `Connected (PID: ${clawdtalkPid})` : 'Disconnected'}
+                      </div>
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    {#if clawdtalkConnected}
+                      <button
+                        onclick={stopClawdTalk}
+                        class="px-3 py-1 text-[10px] tracking-wider uppercase rounded border border-negative/30 text-negative/70 hover:text-negative hover:border-negative/50 transition-colors"
+                      >
+                        Disconnect
+                      </button>
+                    {:else if clawdtalkStarting}
+                      <div class="flex items-center gap-2 text-xs text-ivory-muted">
+                        <div class="w-3 h-3 border-2 border-gold/40 border-t-gold rounded-full animate-spin"></div>
+                        Connecting...
+                      </div>
+                    {:else}
+                      <button
+                        onclick={startClawdTalk}
+                        class="px-3 py-1 text-[10px] tracking-wider uppercase rounded border border-positive/30 text-positive/70 hover:text-positive hover:border-positive/50 transition-colors"
+                      >
+                        Connect
+                      </button>
+                    {/if}
+                  </div>
+                </div>
+
+                <!-- API Key status -->
+                <div class="flex items-center justify-between px-3 py-2 rounded-lg bg-surface-raised">
+                  <div class="flex items-center gap-2 text-xs">
+                    <span class="text-ivory-muted">API Key:</span>
+                    {#if clawdtalkHasKey}
+                      <span class="text-positive flex items-center gap-1">
+                        <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                          <path d="M4.5 12.75l6 6 9-13.5" />
+                        </svg>
+                        Configured
+                      </span>
+                    {:else}
+                      <span class="text-warning text-[10px]">Not set — add key in docker.env</span>
+                    {/if}
+                  </div>
+                  {#if !clawdtalkApiKeyEditing}
+                    <button
+                      onclick={() => clawdtalkApiKeyEditing = true}
+                      class="text-[10px] tracking-wider uppercase text-gold-dim hover:text-gold transition-colors"
+                    >
+                      Update Key
+                    </button>
+                  {/if}
+                </div>
+
+                <!-- Update key form (inline) -->
+                {#if clawdtalkApiKeyEditing}
+                  <div class="flex gap-2 px-3">
+                    <input
+                      type="password"
+                      bind:value={clawdtalkApiKeyValue}
+                      placeholder="New ClawdTalk API key"
+                      class="flex-1 bg-surface text-ivory text-xs px-3 py-2 rounded border border-border focus:border-gold-dim focus:outline-none transition-colors selectable"
+                    />
+                    <button
+                      onclick={() => configureClawdTalk(clawdtalkApiKeyValue)}
+                      disabled={!clawdtalkApiKeyValue || clawdtalkSaving}
+                      class="px-3 py-2 text-[10px] tracking-wider uppercase rounded border border-gold/40 text-gold hover:bg-gold/10 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                    >
+                      Save
+                    </button>
+                    <button
+                      onclick={() => { clawdtalkApiKeyEditing = false; clawdtalkApiKeyValue = ''; }}
+                      class="px-3 py-2 text-[10px] text-ivory-muted hover:text-ivory transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                {/if}
+
+                <!-- Recent logs -->
+                {#if clawdtalkLogs.length > 0}
+                  <div class="px-3">
+                    <p class="text-ivory-muted/40 text-[10px] tracking-wider uppercase mb-1">Recent Activity</p>
+                    <div class="bg-black/30 rounded p-2 max-h-24 overflow-y-auto">
+                      {#each clawdtalkLogs.slice(-5) as line}
+                        <p class="text-ivory-muted/50 text-[10px] font-mono leading-relaxed truncate">{line}</p>
+                      {/each}
+                    </div>
+                  </div>
+                {/if}
+
+                <!-- Remove -->
+                <div class="px-3 pt-1">
+                  <button
+                    onclick={removeClawdTalk}
+                    class="text-[10px] text-ivory-muted/30 hover:text-negative transition-colors"
+                  >
+                    Remove voice calling
+                  </button>
+                </div>
+              </div>
+            {/if}
+
+            {#if clawdtalkError}
+              <p class="text-negative text-xs px-1">{clawdtalkError}</p>
+            {/if}
+          </div>
+        </SettingsSection>
+
+        <!-- ═══════════════ 6. Email Schedule ═══════════════ -->
         <SettingsSection title="Email Notifications" icon={icons.email}>
           <div class="space-y-4">
             <div class="flex items-center justify-between">
