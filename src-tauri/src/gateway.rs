@@ -70,16 +70,19 @@ fn read_gateway_token() -> Result<String, String> {
     Err("Gateway token not found in docker.env".to_string())
 }
 
-/// Extract the assistant reply text from a gateway JSON response.
-fn extract_reply(text: &str) -> String {
-    let json: serde_json::Value = serde_json::from_str(text)
-        .unwrap_or(serde_json::json!({"text": text}));
-
-    json.get("text")
-        .or_else(|| json.get("message"))
-        .or_else(|| json.get("content"))
-        .map(|v| v.as_str().unwrap_or(text).to_string())
-        .unwrap_or_else(|| text.to_string())
+/// Extract the assistant reply from an OpenAI chat completion response.
+fn extract_openai_reply(text: &str) -> String {
+    if let Ok(json) = serde_json::from_str::<serde_json::Value>(text) {
+        // OpenAI format: choices[0].message.content
+        if let Some(content) = json
+            .pointer("/choices/0/message/content")
+            .and_then(|v| v.as_str())
+        {
+            return content.to_string();
+        }
+    }
+    // Fallback: return raw text
+    text.to_string()
 }
 
 fn folders_path() -> PathBuf {
@@ -113,7 +116,7 @@ pub async fn send_message(message: String) -> Result<String, String> {
     send_message_to_session(message, "agent:default:main".to_string()).await
 }
 
-/// Send a message to a specific session via the gateway.
+/// Send a message to a specific session via the gateway's OpenAI-compatible endpoint.
 pub async fn send_message_to_session(message: String, session_key: String) -> Result<String, String> {
     let token = read_gateway_token()?;
 
@@ -122,17 +125,20 @@ pub async fn send_message_to_session(message: String, session_key: String) -> Re
         .build()
         .map_err(|e| format!("HTTP client error: {}", e))?;
 
-    let url = "http://127.0.0.1:18789/api/v1/chat";
+    let url = "http://127.0.0.1:18789/v1/chat/completions";
 
     let body = serde_json::json!({
-        "message": message,
-        "sessionKey": session_key
+        "model": "default",
+        "messages": [
+            { "role": "user", "content": message }
+        ]
     });
 
     let response = client
         .post(url)
         .header("Authorization", format!("Bearer {}", token))
         .header("Content-Type", "application/json")
+        .header("X-OpenClaw-Session-Key", &session_key)
         .json(&body)
         .send()
         .await
@@ -145,7 +151,7 @@ pub async fn send_message_to_session(message: String, session_key: String) -> Re
         .map_err(|e| format!("Failed to read response: {}", e))?;
 
     if status.is_success() {
-        Ok(extract_reply(&text))
+        Ok(extract_openai_reply(&text))
     } else {
         Err(format!("Gateway error ({}): {}", status, text))
     }
@@ -274,13 +280,6 @@ pub fn delete_folder(folder_id: String) -> Result<(), String> {
 /// Verify a source URL for credibility via the Veritas analysis prompt.
 /// Uses a dedicated session key so analysis doesn't pollute chat history.
 pub async fn verify_source(url: String) -> Result<String, String> {
-    let token = read_gateway_token()?;
-
-    let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(120))
-        .build()
-        .map_err(|e| format!("HTTP client error: {}", e))?;
-
     let prompt = format!(
         r#"Analyze the credibility of this source: {}
 
@@ -321,29 +320,6 @@ Return ONLY a JSON object with no markdown fences, no extra text — raw JSON on
         url
     );
 
-    let body = serde_json::json!({
-        "message": prompt,
-        "sessionKey": "agent:default:veritas"
-    });
-
-    let response = client
-        .post("http://127.0.0.1:18789/api/v1/chat")
-        .header("Authorization", format!("Bearer {}", token))
-        .header("Content-Type", "application/json")
-        .json(&body)
-        .send()
-        .await
-        .map_err(|e| format!("Gateway request failed: {}", e))?;
-
-    let status = response.status();
-    let text = response
-        .text()
-        .await
-        .map_err(|e| format!("Failed to read response: {}", e))?;
-
-    if status.is_success() {
-        Ok(extract_reply(&text))
-    } else {
-        Err(format!("Gateway error ({}): {}", status, text))
-    }
+    // Use the shared chat completions function with a dedicated Veritas session
+    send_message_to_session(prompt, "agent:default:veritas".to_string()).await
 }

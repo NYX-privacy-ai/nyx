@@ -1011,10 +1011,15 @@ pub fn write_openclaw_config(config: &SetupConfig) -> Result<(), String> {
         "gateway": {
             "port": 18789,
             "mode": "local",
-            "bind": "loopback",
+            "bind": "lan",
             "auth": {
                 "mode": "token",
                 "token": &config.gateway_token
+            },
+            "http": {
+                "endpoints": {
+                    "chatCompletions": { "enabled": true }
+                }
             },
             "tailscale": { "mode": "off", "resetOnExit": false },
             "controlUi": { "enabled": false }

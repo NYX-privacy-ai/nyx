@@ -40,14 +40,14 @@ services:
     env_file:
       - docker.env
     environment:
-      - OPENCLAW_GATEWAY_BIND=localhost
+      - OPENCLAW_GATEWAY_BIND=0.0.0.0
       - OPENCLAW_CONFIG_PATH=/home/node/.openclaw/openclaw.json
       # Cross-chain support
       - CROSS_CHAIN_ENABLED=true
       - ONECLICK_API_URL=https://1click.chaindefuser.com/v0
       # Privacy: ZEC as default crypto layer
       - ZEC_PRIVACY_DEFAULT=true
-    command: ["node", "dist/index.js", "gateway", "--bind", "loopback", "--port", "18789"]
+    command: ["node", "dist/index.js", "gateway", "--bind", "lan", "--port", "18789"]
     user: "1000:1000"
     security_opt:
       - no-new-privileges:true
