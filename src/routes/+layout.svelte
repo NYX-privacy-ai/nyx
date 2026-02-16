@@ -19,7 +19,8 @@
   const nav = [
     { href: '/', icon: 'dashboard', label: 'Dashboard' },
     { href: '/chat', icon: 'chat', label: 'Chat' },
-    { href: '/verify', icon: 'verify', label: 'Verify' }
+    { href: '/verify', icon: 'verify', label: 'Verify' },
+    { href: '/privacy', icon: 'privacy', label: 'Privacy' }
   ];
 
   function isActive(href: string, pathname: string) {
@@ -137,6 +138,10 @@
           {:else if item.icon === 'verify'}
             <svg class="w-5 h-5 transition-colors duration-300" class:text-gold={isActive(item.href, $page.url.pathname)} class:text-ivory-muted={!isActive(item.href, $page.url.pathname)} fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
               <path d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
+            </svg>
+          {:else if item.icon === 'privacy'}
+            <svg class="w-5 h-5 transition-colors duration-300" class:text-gold={isActive(item.href, $page.url.pathname)} class:text-ivory-muted={!isActive(item.href, $page.url.pathname)} fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+              <path d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
             </svg>
           {/if}
 

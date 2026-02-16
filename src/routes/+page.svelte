@@ -121,6 +121,31 @@
       </section>
     </div>
 
+    <!-- Privacy Shield Status -->
+    <section class="mb-10">
+      <a href="/privacy" class="block bg-surface border border-border rounded-xl p-5 hover:border-gold/30 transition-all duration-300 group">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-4">
+            <div class="w-10 h-10 rounded-lg bg-gold/10 border border-gold/20 flex items-center justify-center">
+              <svg class="w-5 h-5 text-gold" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                <path d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+              </svg>
+            </div>
+            <div>
+              <h3 class="text-ivory text-sm font-medium">Privacy Shield</h3>
+              <p class="text-ivory-muted/50 text-xs mt-0.5">Convert to shielded ZEC for cryptographic privacy</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="text-gold/60 text-xs tracking-wider uppercase group-hover:text-gold transition-colors">Shield Assets</span>
+            <svg class="w-4 h-4 text-ivory-muted/30 group-hover:text-gold/60 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+            </svg>
+          </div>
+        </div>
+      </a>
+    </section>
+
     <!-- Activity -->
     <section>
       <h2 class="text-ivory-muted text-xs tracking-widest uppercase mb-4">Recent Activity</h2>

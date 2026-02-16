@@ -269,8 +269,19 @@ async fn get_cross_chain_quote(
     asset_in: String,
     asset_out: String,
     amount_in: String,
+    recipient: String,
+    refund_to: String,
+    dry_run: Option<bool>,
 ) -> Result<oneclick::QuoteResponse, String> {
-    oneclick::get_quote(&asset_in, &asset_out, &amount_in).await
+    oneclick::get_quote(
+        &asset_in,
+        &asset_out,
+        &amount_in,
+        &recipient,
+        &refund_to,
+        dry_run.unwrap_or(true),
+    )
+    .await
 }
 
 #[tauri::command]
@@ -281,6 +292,37 @@ async fn get_swap_status(swap_id: String) -> Result<oneclick::SwapStatus, String
 #[tauri::command]
 fn resolve_asset_id(chain: String, symbol: String) -> Result<String, String> {
     oneclick::resolve_asset_id(&chain, &symbol)
+}
+
+/// Get a quote to shield assets into ZEC (any supported asset → ZEC).
+#[tauri::command]
+async fn get_zec_shield_quote(
+    from_asset: String,
+    amount: String,
+) -> Result<oneclick::QuoteResponse, String> {
+    let zec_address = config::get_zec_address()
+        .ok_or_else(|| "No ZEC address configured. Add a ZEC wallet in Settings.".to_string())?;
+    let refund_to = config::get_near_account()
+        .unwrap_or_else(|| "nyx.near".to_string());
+    oneclick::get_zec_quote(&from_asset, &amount, &zec_address, &refund_to).await
+}
+
+/// Get a quote to unshield from ZEC to any asset (ZEC → any supported asset).
+#[tauri::command]
+async fn get_zec_unshield_quote(
+    to_asset: String,
+    zec_amount: String,
+    recipient: String,
+) -> Result<oneclick::QuoteResponse, String> {
+    let zec_refund = config::get_zec_address()
+        .ok_or_else(|| "No ZEC address configured. Add a ZEC wallet in Settings.".to_string())?;
+    oneclick::get_quote_from_zec(&to_asset, &zec_amount, &recipient, &zec_refund).await
+}
+
+/// Get the list of assets that can be shielded to ZEC.
+#[tauri::command]
+fn get_shieldable_assets() -> Vec<oneclick::ShieldableAsset> {
+    oneclick::get_shieldable_assets()
 }
 
 // ---------------------------------------------------------------------------
@@ -537,6 +579,10 @@ fn main() {
             get_cross_chain_quote,
             get_swap_status,
             resolve_asset_id,
+            // ZEC Privacy Shield
+            get_zec_shield_quote,
+            get_zec_unshield_quote,
+            get_shieldable_assets,
             // Container
             docker_start,
             docker_stop,

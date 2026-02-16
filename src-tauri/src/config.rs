@@ -653,6 +653,62 @@ pub fn save_settings(update: SettingsUpdate) -> Result<SettingsSaveResult, Strin
 }
 
 // ---------------------------------------------------------------------------
+// ZEC / NEAR address helpers (used by shield/unshield commands)
+// ---------------------------------------------------------------------------
+
+/// Get the configured ZEC wallet address from docker.env wallets.
+pub fn get_zec_address() -> Option<String> {
+    let home = home_dir();
+    let env_path = home.join("openclaw/docker.env");
+    let env = parse_env_file(&env_path).ok()?;
+
+    let wallet_count: usize = env.get("WALLET_COUNT")
+        .and_then(|v| v.parse().ok()).unwrap_or(0);
+
+    for i in 0..wallet_count {
+        let chain = env.get(&format!("WALLET_{}_CHAIN", i)).cloned().unwrap_or_default();
+        if chain == "zec" {
+            if let Some(addr) = env.get(&format!("WALLET_{}_ADDRESS", i)) {
+                if !addr.is_empty() {
+                    return Some(addr.clone());
+                }
+            }
+        }
+    }
+    None
+}
+
+/// Get the configured NEAR account ID from docker.env wallets.
+pub fn get_near_account() -> Option<String> {
+    let home = home_dir();
+    let env_path = home.join("openclaw/docker.env");
+    let env = parse_env_file(&env_path).ok()?;
+
+    // Check for explicit NEAR_ACCOUNT_ID first
+    if let Some(account) = env.get("NEAR_ACCOUNT_ID") {
+        if !account.is_empty() {
+            return Some(account.clone());
+        }
+    }
+
+    // Fall back to first NEAR wallet address
+    let wallet_count: usize = env.get("WALLET_COUNT")
+        .and_then(|v| v.parse().ok()).unwrap_or(0);
+
+    for i in 0..wallet_count {
+        let chain = env.get(&format!("WALLET_{}_CHAIN", i)).cloned().unwrap_or_default();
+        if chain == "near" {
+            if let Some(addr) = env.get(&format!("WALLET_{}_ADDRESS", i)) {
+                if !addr.is_empty() {
+                    return Some(addr.clone());
+                }
+            }
+        }
+    }
+    None
+}
+
+// ---------------------------------------------------------------------------
 // Directory creation
 // ---------------------------------------------------------------------------
 
