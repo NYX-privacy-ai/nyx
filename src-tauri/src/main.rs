@@ -1,16 +1,21 @@
 // Prevents additional console window on Windows in release
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+// Shared modules from nyx_lib (used by both Tauri GUI and MCP server)
+use nyx_lib::config;
+use nyx_lib::docker;
+use nyx_lib::gateway;
+use nyx_lib::oneclick;
+use nyx_lib::wallet;
+
+// Tauri-only modules (UI-specific or have Tauri dependencies)
 mod clawdtalk;
-mod config;
-mod docker;
-mod gateway;
+mod claudecode;
 mod google;
 mod ollama;
-mod oneclick;
 mod portfolio;
+mod pty;
 mod setup;
-mod wallet;
 
 // ---------------------------------------------------------------------------
 // Docker commands
@@ -432,6 +437,54 @@ async fn restart_container() -> Result<(), String> {
 }
 
 // ---------------------------------------------------------------------------
+// Claude Code integration
+// ---------------------------------------------------------------------------
+
+#[tauri::command]
+fn claude_code_status() -> Result<claudecode::ClaudeCodeStatus, String> {
+    claudecode::check_status()
+}
+
+#[tauri::command]
+async fn claude_code_register_mcp() -> Result<String, String> {
+    claudecode::register_mcp_server().await
+}
+
+#[tauri::command]
+async fn claude_code_unregister_mcp() -> Result<(), String> {
+    claudecode::unregister_mcp_server().await
+}
+
+// ---------------------------------------------------------------------------
+// PTY (embedded terminal)
+// ---------------------------------------------------------------------------
+
+#[tauri::command]
+fn pty_spawn(
+    app: tauri::AppHandle,
+    command: Option<String>,
+    cols: Option<u16>,
+    rows: Option<u16>,
+) -> Result<String, String> {
+    pty::spawn(app, command, cols.unwrap_or(120), rows.unwrap_or(36))
+}
+
+#[tauri::command]
+fn pty_write(session_id: String, data: String) -> Result<(), String> {
+    pty::write_to(&session_id, &data)
+}
+
+#[tauri::command]
+fn pty_resize(session_id: String, cols: u16, rows: u16) -> Result<(), String> {
+    pty::resize(&session_id, cols, rows)
+}
+
+#[tauri::command]
+fn pty_kill(session_id: String) -> Result<(), String> {
+    pty::kill(&session_id)
+}
+
+// ---------------------------------------------------------------------------
 // ClawdTalk (voice calling)
 // ---------------------------------------------------------------------------
 
@@ -608,6 +661,15 @@ fn main() {
             clawdtalk_start,
             clawdtalk_stop,
             clawdtalk_logs,
+            // Claude Code
+            claude_code_status,
+            claude_code_register_mcp,
+            claude_code_unregister_mcp,
+            // PTY (embedded terminal)
+            pty_spawn,
+            pty_write,
+            pty_resize,
+            pty_kill,
         ])
         .setup(|app| {
             let handle = app.handle().clone();

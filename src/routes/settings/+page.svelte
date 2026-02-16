@@ -87,6 +87,15 @@
   let clawdtalkStarting = $state(false);
   let clawdtalkError = $state('');
 
+  // Claude Code state
+  let claudeCodeInstalled = $state(false);
+  let claudeCodeVersion = $state('');
+  let claudeCodeMcpRegistered = $state(false);
+  let claudeCodeBinaryPath = $state('');
+  let claudeCodeLoading = $state(false);
+  let claudeCodeError = $state('');
+  let claudeCodeRegistering = $state(false);
+
   // Update state
   let updateAvailable = $state(false);
   let updateVersion = $state('');
@@ -238,8 +247,8 @@
         appVersion = '';
       }
 
-      // Load ClawdTalk status
-      await loadClawdTalkStatus();
+      // Load ClawdTalk and Claude Code status
+      await Promise.all([loadClawdTalkStatus(), loadClaudeCodeStatus()]);
 
     } catch (e: any) {
       loadError = e?.toString() || 'Failed to load settings';
@@ -635,6 +644,44 @@
     }
   }
 
+  // ── Claude Code functions ──
+  async function loadClaudeCodeStatus() {
+    try {
+      const { invoke } = await import('@tauri-apps/api/core');
+      const status: any = await invoke('claude_code_status');
+      claudeCodeInstalled = status.installed;
+      claudeCodeVersion = status.version ?? '';
+      claudeCodeMcpRegistered = status.mcp_registered;
+      claudeCodeBinaryPath = status.binary_path ?? '';
+    } catch {
+      // Claude Code detection not available
+    }
+  }
+
+  async function registerClaudeCodeMcp() {
+    claudeCodeRegistering = true;
+    claudeCodeError = '';
+    try {
+      const { invoke } = await import('@tauri-apps/api/core');
+      await invoke('claude_code_register_mcp');
+      await loadClaudeCodeStatus();
+    } catch (e: any) {
+      claudeCodeError = e?.toString() || 'Registration failed';
+    }
+    claudeCodeRegistering = false;
+  }
+
+  async function unregisterClaudeCodeMcp() {
+    claudeCodeError = '';
+    try {
+      const { invoke } = await import('@tauri-apps/api/core');
+      await invoke('claude_code_unregister_mcp');
+      await loadClaudeCodeStatus();
+    } catch (e: any) {
+      claudeCodeError = e?.toString() || 'Unregister failed';
+    }
+  }
+
   // ── Helper to open URLs ──
   async function openExternal(url: string) {
     try {
@@ -656,6 +703,7 @@
     update: 'M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3',
     server: 'M21.75 17.25v-.228a4.5 4.5 0 00-.12-1.03l-2.268-9.64a3.375 3.375 0 00-3.285-2.602H7.923a3.375 3.375 0 00-3.285 2.602l-2.268 9.64a4.5 4.5 0 00-.12 1.03v.228m19.5 0a3 3 0 01-3 3H5.25a3 3 0 01-3-3m19.5 0a3 3 0 00-3-3H5.25a3 3 0 00-3 3m16.5 0h.008v.008h-.008v-.008zm-3 0h.008v.008h-.008v-.008z',
     phone: 'M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 01-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z',
+    terminal: 'M6.75 7.5l3 2.25-3 2.25m4.5 0h3m-9 8.25h12a2.25 2.25 0 002.25-2.25V5.25A2.25 2.25 0 0018 3H6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 006 21z',
   };
 </script>
 
@@ -1245,6 +1293,110 @@
 
             {#if clawdtalkError}
               <p class="text-negative text-xs px-1">{clawdtalkError}</p>
+            {/if}
+          </div>
+        </SettingsSection>
+
+        <!-- ═══════════════ 5b. Claude Code (MCP Integration) ═══════════════ -->
+        <SettingsSection title="Claude Code" icon={icons.terminal}>
+          <div class="space-y-4">
+            <p class="text-ivory-muted/50 text-xs leading-relaxed">
+              Register Nyx as an MCP server so Claude Code can access your portfolio, chat with Atlas, verify sources, and more.
+            </p>
+
+            <!-- CLI status -->
+            <div class="flex items-center justify-between px-3 py-2.5 rounded-lg bg-surface border border-border/50">
+              <div class="flex items-center gap-3">
+                <div class="w-7 h-7 rounded-lg flex items-center justify-center text-[10px] font-bold flex-shrink-0 {claudeCodeInstalled ? 'bg-positive/15 text-positive' : 'bg-ivory-muted/10 text-ivory-muted'}">
+                  <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                    <path d={icons.terminal} />
+                  </svg>
+                </div>
+                <div class="min-w-0">
+                  <div class="text-ivory text-xs font-medium">Claude Code CLI</div>
+                  <div class="text-[10px] {claudeCodeInstalled ? 'text-positive' : 'text-ivory-muted/50'}">
+                    {claudeCodeInstalled ? `Installed${claudeCodeVersion ? ` (${claudeCodeVersion})` : ''}` : 'Not found'}
+                  </div>
+                </div>
+              </div>
+              {#if !claudeCodeInstalled}
+                <button
+                  onclick={() => openExternal('https://docs.anthropic.com/en/docs/claude-code')}
+                  class="flex items-center gap-1 text-gold-dim hover:text-gold text-xs transition-colors"
+                >
+                  <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+                  </svg>
+                  Install
+                </button>
+              {/if}
+            </div>
+
+            {#if claudeCodeInstalled}
+              <!-- MCP registration status -->
+              <div class="flex items-center justify-between px-3 py-2.5 rounded-lg bg-surface border border-border/50">
+                <div class="flex items-center gap-3">
+                  <div class="w-7 h-7 rounded-lg flex items-center justify-center text-[10px] font-bold flex-shrink-0 {claudeCodeMcpRegistered ? 'bg-positive/15 text-positive' : 'bg-ivory-muted/10 text-ivory-muted'}">
+                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                      <path d={icons.server} />
+                    </svg>
+                  </div>
+                  <div class="min-w-0">
+                    <div class="text-ivory text-xs font-medium">Nyx MCP Server</div>
+                    <div class="text-[10px] {claudeCodeMcpRegistered ? 'text-positive' : 'text-ivory-muted/50'}">
+                      {claudeCodeMcpRegistered ? 'Registered' : 'Not registered'}
+                    </div>
+                  </div>
+                </div>
+                <div class="flex items-center gap-2">
+                  {#if claudeCodeRegistering}
+                    <div class="flex items-center gap-2 text-xs text-ivory-muted">
+                      <div class="w-3 h-3 border-2 border-gold/40 border-t-gold rounded-full animate-spin"></div>
+                      Registering...
+                    </div>
+                  {:else if claudeCodeMcpRegistered}
+                    <button
+                      onclick={unregisterClaudeCodeMcp}
+                      class="px-3 py-1 text-[10px] tracking-wider uppercase rounded border border-negative/30 text-negative/70 hover:text-negative hover:border-negative/50 transition-colors"
+                    >
+                      Unregister
+                    </button>
+                  {:else}
+                    <button
+                      onclick={registerClaudeCodeMcp}
+                      class="px-3 py-1 text-[10px] tracking-wider uppercase rounded border border-positive/30 text-positive/70 hover:text-positive hover:border-positive/50 transition-colors"
+                    >
+                      Register
+                    </button>
+                  {/if}
+                </div>
+              </div>
+
+              <!-- Tools info -->
+              {#if claudeCodeMcpRegistered}
+                <div class="px-3">
+                  <p class="text-ivory-muted/40 text-[10px] tracking-wider uppercase mb-1.5">Available Tools</p>
+                  <div class="grid grid-cols-2 gap-1.5">
+                    {#each [
+                      { name: 'nyx_chat', desc: 'Chat with Atlas' },
+                      { name: 'nyx_portfolio', desc: 'DeFi portfolio' },
+                      { name: 'nyx_verify_source', desc: 'Source verification' },
+                      { name: 'nyx_docker_status', desc: 'Container status' },
+                      { name: 'nyx_sessions', desc: 'Session management' },
+                      { name: 'nyx_zec_quote', desc: 'ZEC shield quotes' },
+                    ] as tool}
+                      <div class="flex items-center gap-1.5 text-[10px]">
+                        <span class="text-positive">&#x2713;</span>
+                        <span class="text-ivory-muted font-mono">{tool.name}</span>
+                      </div>
+                    {/each}
+                  </div>
+                </div>
+              {/if}
+            {/if}
+
+            {#if claudeCodeError}
+              <p class="text-negative text-xs px-1">{claudeCodeError}</p>
             {/if}
           </div>
         </SettingsSection>
