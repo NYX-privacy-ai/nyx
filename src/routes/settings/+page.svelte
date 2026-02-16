@@ -60,6 +60,7 @@
     email_intelligence: true,
     communications: true,
     source_intelligence: true,
+    activity_intelligence: false,
   });
   let googleAuthenticated = $state(false);
   let ollamaModel = $state('');
@@ -95,6 +96,10 @@
   let claudeCodeLoading = $state(false);
   let claudeCodeError = $state('');
   let claudeCodeRegistering = $state(false);
+
+  // Activity Intelligence autonomy
+  let autonomySettings = $state<{activity_type: string, level: string, total_accepted: number, total_dismissed: number}[]>([]);
+  let autonomyLoading = $state(false);
 
   // Update state
   let updateAvailable = $state(false);
@@ -213,6 +218,7 @@
         email_intelligence: c.email_intelligence,
         communications: c.communications,
         source_intelligence: c.source_intelligence,
+        activity_intelligence: c.activity_intelligence ?? false,
       };
       googleAuthenticated = config.google_authenticated;
       ollamaModel = c.ollama_model || '';
@@ -248,7 +254,7 @@
       }
 
       // Load ClawdTalk and Claude Code status
-      await Promise.all([loadClawdTalkStatus(), loadClaudeCodeStatus()]);
+      await Promise.all([loadClawdTalkStatus(), loadClaudeCodeStatus(), loadAutonomySettings()]);
 
     } catch (e: any) {
       loadError = e?.toString() || 'Failed to load settings';
@@ -344,6 +350,7 @@
           email_intelligence: capabilities.email_intelligence,
           communications: capabilities.communications,
           source_intelligence: capabilities.source_intelligence,
+          activity_intelligence: capabilities.activity_intelligence,
           default_llm_provider: defaultLlmProvider,
           ollama_model: ollamaModel || null,
         };
@@ -680,6 +687,28 @@
     } catch (e: any) {
       claudeCodeError = e?.toString() || 'Unregister failed';
     }
+  }
+
+  // ── Activity Intelligence autonomy ──
+  async function loadAutonomySettings() {
+    if (!capabilities.activity_intelligence) return;
+    autonomyLoading = true;
+    try {
+      const { invoke } = await import('@tauri-apps/api/core');
+      const settings: any[] = await invoke('get_autonomy_settings');
+      autonomySettings = settings;
+    } catch {}
+    autonomyLoading = false;
+  }
+
+  async function updateAutonomyLevel(activityType: string, level: string) {
+    try {
+      const { invoke } = await import('@tauri-apps/api/core');
+      await invoke('set_autonomy_level', { activityType, level });
+      autonomySettings = autonomySettings.map(s =>
+        s.activity_type === activityType ? { ...s, level } : s
+      );
+    } catch {}
   }
 
   // ── Helper to open URLs ──
@@ -1463,6 +1492,7 @@
               { key: 'email_intelligence', abbr: 'Em', name: 'Email Intelligence', desc: 'Priority triage, daily digest, inbox awareness', color: 'bg-amber-500/15 text-amber-300' },
               { key: 'communications', abbr: 'Co', name: 'Communications', desc: 'Telegram, WhatsApp, Slack with autonomy controls', color: 'bg-purple-500/15 text-purple-400' },
               { key: 'source_intelligence', abbr: 'Ve', name: 'Source Verification', desc: 'Credibility analysis and fact-checking', color: 'bg-cyan-500/15 text-cyan-300' },
+              { key: 'activity_intelligence', abbr: 'Ai', name: 'Activity Intelligence', desc: 'Observe calendar & email patterns to offer proactive suggestions', color: 'bg-rose-500/15 text-rose-300' },
             ] as cap}
               <div class="flex items-center justify-between px-3 py-2.5 rounded-lg bg-surface border border-border/50">
                 <div class="flex items-center gap-3">
@@ -1511,6 +1541,77 @@
                   {googleAuthenticated ? 'Re-authenticate' : 'Authenticate'}
                 </button>
               </div>
+            {/if}
+
+            <!-- Activity Intelligence privacy notice + autonomy controls -->
+            {#if capabilities.activity_intelligence}
+              <div class="px-3 py-2.5 rounded-lg bg-rose-500/5 border border-rose-500/20">
+                <div class="flex items-start gap-2">
+                  <svg class="w-3.5 h-3.5 text-rose-300 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                    <path d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+                  </svg>
+                  <div>
+                    <p class="text-ivory-muted/70 text-[10px] leading-relaxed">
+                      When enabled, Nyx periodically reads your calendar events and email metadata (sender, subject, timestamps &mdash; <strong class="text-ivory-muted">not email bodies</strong>) to build a local behavioural model. All data stays on your machine in <code class="text-rose-300/60">~/.nyx/intelligence.db</code>. Disable at any time to stop observation.
+                    </p>
+                    <button
+                      onclick={async () => { if (confirm('Delete all collected Activity Intelligence data? This cannot be undone.')) { try { const { invoke } = await import('@tauri-apps/api/core'); await invoke('clear_intelligence_data'); } catch {} } }}
+                      class="mt-1.5 text-[9px] tracking-wider uppercase text-rose-300/50 hover:text-rose-300 transition-colors"
+                    >
+                      Clear collected data
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Autonomy levels -->
+              {#if autonomySettings.length > 0}
+                <div class="px-3 py-3 rounded-lg bg-surface border border-border/50">
+                  <h4 class="text-ivory-muted text-[10px] tracking-widest uppercase mb-3">Autonomy Levels</h4>
+                  <div class="space-y-3">
+                    {#each [
+                      { type: 'scheduling', label: 'Scheduling', desc: 'Create calendar events and meeting invites' },
+                      { type: 'email_reply', label: 'Email Replies', desc: 'Draft and send email responses' },
+                      { type: 'follow_up', label: 'Follow-ups', desc: 'Send follow-up messages and reminders' },
+                      { type: 'outreach', label: 'Outreach', desc: 'Initiate contact and introductions' },
+                    ] as activity}
+                      {@const setting = autonomySettings.find(s => s.activity_type === activity.type)}
+                      {@const currentLevel = setting?.level || 'suggest'}
+                      {@const levels = ['observe', 'suggest', 'draft', 'act']}
+                      {@const currentIdx = levels.indexOf(currentLevel)}
+                      <div>
+                        <div class="flex items-center justify-between mb-1.5">
+                          <div>
+                            <span class="text-ivory text-xs">{activity.label}</span>
+                            <span class="text-ivory-muted/30 text-[9px] ml-2">{activity.desc}</span>
+                          </div>
+                          <span class="text-[9px] tracking-wider uppercase {currentLevel === 'act' ? 'text-negative' : currentLevel === 'draft' ? 'text-gold' : currentLevel === 'suggest' ? 'text-rose-300/60' : 'text-ivory-muted/40'}">
+                            {currentLevel}
+                          </span>
+                        </div>
+                        <div class="flex gap-1">
+                          {#each levels as level, i}
+                            <button
+                              onclick={() => updateAutonomyLevel(activity.type, level)}
+                              class="flex-1 h-1.5 rounded-full transition-colors duration-200 {i <= currentIdx
+                                ? (currentLevel === 'act' ? 'bg-negative/60' : currentLevel === 'draft' ? 'bg-gold/50' : 'bg-rose-400/40')
+                                : 'bg-border/30'
+                              } hover:opacity-80"
+                              title="{level.charAt(0).toUpperCase() + level.slice(1)}"
+                            ></button>
+                          {/each}
+                        </div>
+                        {#if currentLevel === 'act'}
+                          <p class="text-negative/50 text-[9px] mt-1">Nyx will take autonomous action for {activity.label.toLowerCase()}</p>
+                        {/if}
+                      </div>
+                    {/each}
+                  </div>
+                  <p class="text-ivory-muted/25 text-[9px] mt-3">
+                    Observe &mdash; collect data silently &bull; Suggest &mdash; show recommendation cards &bull; Draft &mdash; create drafts for review &bull; Act &mdash; execute autonomously
+                  </p>
+                </div>
+              {/if}
             {/if}
           </div>
         </SettingsSection>

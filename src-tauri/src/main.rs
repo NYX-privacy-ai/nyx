@@ -12,6 +12,7 @@ use nyx_lib::wallet;
 mod clawdtalk;
 mod claudecode;
 mod google;
+mod intelligence;
 mod ollama;
 mod portfolio;
 mod pty;
@@ -485,6 +486,50 @@ fn pty_kill(session_id: String) -> Result<(), String> {
 }
 
 // ---------------------------------------------------------------------------
+// Activity Intelligence
+// ---------------------------------------------------------------------------
+
+#[tauri::command]
+fn get_intelligence_suggestions() -> Result<Vec<intelligence::Suggestion>, String> {
+    intelligence::get_suggestions()
+}
+
+#[tauri::command]
+fn dismiss_intelligence_suggestion(id: i64) -> Result<(), String> {
+    intelligence::dismiss_suggestion(id)
+}
+
+#[tauri::command]
+fn accept_intelligence_suggestion(id: i64) -> Result<intelligence::Suggestion, String> {
+    intelligence::accept_suggestion(id)
+}
+
+#[tauri::command]
+fn get_contact_insights(email: String) -> Result<intelligence::ContactInsight, String> {
+    intelligence::get_contact_insights(&email)
+}
+
+#[tauri::command]
+fn get_activity_stats() -> Result<intelligence::ActivityStats, String> {
+    intelligence::get_activity_stats()
+}
+
+#[tauri::command]
+fn get_autonomy_settings() -> Result<Vec<intelligence::AutonomySetting>, String> {
+    intelligence::get_autonomy_settings()
+}
+
+#[tauri::command]
+fn set_autonomy_level(activity_type: String, level: String) -> Result<(), String> {
+    intelligence::set_autonomy_level(&activity_type, &level)
+}
+
+#[tauri::command]
+fn clear_intelligence_data() -> Result<(), String> {
+    intelligence::clear_all_data()
+}
+
+// ---------------------------------------------------------------------------
 // ClawdTalk (voice calling)
 // ---------------------------------------------------------------------------
 
@@ -670,6 +715,15 @@ fn main() {
             pty_write,
             pty_resize,
             pty_kill,
+            // Activity Intelligence
+            get_intelligence_suggestions,
+            dismiss_intelligence_suggestion,
+            accept_intelligence_suggestion,
+            get_contact_insights,
+            get_activity_stats,
+            get_autonomy_settings,
+            set_autonomy_level,
+            clear_intelligence_data,
         ])
         .setup(|app| {
             let handle = app.handle().clone();
@@ -679,6 +733,11 @@ fn main() {
                     eprintln!("Portfolio watcher error: {}", e);
                 }
             });
+
+            // Start Activity Intelligence observer in background
+            let intel_handle = app.handle().clone();
+            intelligence::start_observer(intel_handle);
+
             Ok(())
         })
         .run(tauri::generate_context!())

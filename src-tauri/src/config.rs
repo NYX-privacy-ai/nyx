@@ -203,6 +203,9 @@ pub struct CapabilitiesConfig {
     pub email_intelligence: bool,
     pub communications: bool,
     pub source_intelligence: bool,
+    /// Observe calendar + email patterns to offer proactive suggestions
+    #[serde(default)]
+    pub activity_intelligence: bool,
     /// Default LLM provider: "anthropic", "venice", "openai", "nearai", or "ollama"
     pub default_llm_provider: String,
     /// Selected Ollama model tag (e.g. "qwen3:4b"), None if not using local models
@@ -219,6 +222,7 @@ impl Default for CapabilitiesConfig {
             email_intelligence: true,
             communications: true,
             source_intelligence: true,
+            activity_intelligence: false, // opt-in — requires explicit enable
             default_llm_provider: "anthropic".to_string(),
             ollama_model: None,
         }
@@ -420,6 +424,10 @@ pub fn read_current_config() -> Result<SettingsConfig, String> {
         email_intelligence: parse_bool("CAPABILITY_EMAIL_INTEL"),
         communications: parse_bool("CAPABILITY_COMMS"),
         source_intelligence: parse_bool("CAPABILITY_SOURCE_INTEL"),
+        activity_intelligence: env
+            .get("CAPABILITY_ACTIVITY_INTEL")
+            .map(|v| v == "true")
+            .unwrap_or(false),
         default_llm_provider: default_llm_provider.clone(),
         ollama_model: env.get("OLLAMA_MODEL")
             .filter(|v| !v.is_empty())
@@ -837,6 +845,7 @@ pub fn write_docker_env(config: &SetupConfig) -> Result<(), String> {
          CAPABILITY_EMAIL_INTEL={}\n\
          CAPABILITY_COMMS={}\n\
          CAPABILITY_SOURCE_INTEL={}\n\
+         CAPABILITY_ACTIVITY_INTEL={}\n\
          DEFAULT_LLM_PROVIDER={}\n\
          OLLAMA_MODEL={}\n",
         m.gmail.enabled,
@@ -850,6 +859,7 @@ pub fn write_docker_env(config: &SetupConfig) -> Result<(), String> {
         caps.email_intelligence,
         caps.communications,
         caps.source_intelligence,
+        caps.activity_intelligence,
         caps.default_llm_provider,
         caps.ollama_model.as_deref().unwrap_or(""),
     ));
