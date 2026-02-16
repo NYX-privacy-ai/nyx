@@ -100,6 +100,7 @@
   // Activity Intelligence autonomy
   let autonomySettings = $state<{activity_type: string, level: string, total_accepted: number, total_dismissed: number}[]>([]);
   let autonomyLoading = $state(false);
+  let showAppRestartNotice = $state(false);
 
   // Update state
   let updateAvailable = $state(false);
@@ -356,6 +357,11 @@
         };
       }
 
+      // Detect if activity_intelligence was just toggled ON (before save)
+      const wasIntelOff = !JSON.parse(snapshot).capabilities?.activity_intelligence;
+      const isIntelOn = capabilities.activity_intelligence;
+      const intelJustEnabled = wasIntelOff && isIntelOn;
+
       const result: any = await invoke('save_settings', { update });
 
       if (result.success) {
@@ -366,6 +372,10 @@
           } catch {
             // Container might not be running — that's ok
           }
+        }
+        // Show app restart notice if Activity Intelligence was just enabled
+        if (intelJustEnabled) {
+          showAppRestartNotice = true;
         }
         // Reload config to refresh snapshot
         await loadConfig();
@@ -1568,6 +1578,18 @@
                   </div>
                 </div>
               </div>
+
+              <!-- App restart notice (observer runs in the Tauri process, not Docker) -->
+              {#if showAppRestartNotice}
+                <div class="px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-start gap-2">
+                  <svg class="w-3.5 h-3.5 text-amber-300 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                    <path d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182" />
+                  </svg>
+                  <p class="text-amber-200/80 text-[10px] leading-relaxed">
+                    Activity Intelligence has been enabled. <strong class="text-amber-200">Please restart Nyx</strong> for the background observer to begin collecting data.
+                  </p>
+                </div>
+              {/if}
 
               <!-- Autonomy levels -->
               {#if autonomySettings.length > 0}
