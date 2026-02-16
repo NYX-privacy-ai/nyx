@@ -815,7 +815,7 @@
             <!-- Anthropic API Key -->
             <div>
               <div class="flex items-center justify-between mb-1.5">
-                <label class="text-ivory-muted text-xs">
+                <label for="setup-anthropic-key" class="text-ivory-muted text-xs">
                   Anthropic Claude <span class="text-gold text-[10px] uppercase tracking-wider ml-1">Recommended</span>
                 </label>
                 <button
@@ -830,6 +830,7 @@
               </div>
               <div class="relative">
                 <input
+                  id="setup-anthropic-key"
                   type="password"
                   bind:value={anthropicKey}
                   placeholder="sk-ant-..."
@@ -863,11 +864,11 @@
             <!-- OpenAI -->
             <div>
               <div class="flex items-center justify-between mb-1.5">
-                <label class="text-ivory-muted/70 text-xs">OpenAI <span class="text-ivory-muted/30">(voice, GPT-4o)</span></label>
+                <label for="setup-openai-key" class="text-ivory-muted/70 text-xs">OpenAI <span class="text-ivory-muted/30">(voice, GPT-4o)</span></label>
                 <button onclick={() => openExternal('https://platform.openai.com/api-keys')} class="text-gold-dim hover:text-gold text-xs transition-colors">Get Key</button>
               </div>
               <div class="relative">
-                <input type="password" bind:value={openaiKey} placeholder="sk-proj-..."
+                <input id="setup-openai-key" type="password" bind:value={openaiKey} placeholder="sk-proj-..."
                   class="w-full bg-surface text-ivory text-sm px-4 py-2.5 rounded border focus:outline-none transition-colors duration-300 selectable {openaiValid ? 'border-positive/50' : 'border-border focus:border-gold-dim'}" />
                 {#if openaiValid}
                   <div class="absolute right-3 top-1/2 -translate-y-1/2">
@@ -880,11 +881,11 @@
             <!-- Venice AI -->
             <div>
               <div class="flex items-center justify-between mb-1.5">
-                <label class="text-ivory-muted/70 text-xs">Venice AI <span class="text-ivory-muted/30">(privacy-first)</span></label>
+                <label for="setup-venice-key" class="text-ivory-muted/70 text-xs">Venice AI <span class="text-ivory-muted/30">(privacy-first)</span></label>
                 <button onclick={() => openExternal('https://venice.ai/settings/api')} class="text-gold-dim hover:text-gold text-xs transition-colors">Get Key</button>
               </div>
               <div class="relative">
-                <input type="password" bind:value={veniceKey} placeholder="venice-..."
+                <input id="setup-venice-key" type="password" bind:value={veniceKey} placeholder="venice-..."
                   class="w-full bg-surface text-ivory text-sm px-4 py-2.5 rounded border focus:outline-none transition-colors duration-300 selectable {veniceValid ? 'border-positive/50' : 'border-border focus:border-gold-dim'}" />
                 {#if veniceValid}
                   <div class="absolute right-3 top-1/2 -translate-y-1/2">
@@ -897,11 +898,11 @@
             <!-- NEAR.ai -->
             <div>
               <div class="flex items-center justify-between mb-1.5">
-                <label class="text-ivory-muted/70 text-xs">NEAR.ai <span class="text-ivory-muted/30">(TEE confidential)</span></label>
+                <label for="setup-nearai-key" class="text-ivory-muted/70 text-xs">NEAR.ai <span class="text-ivory-muted/30">(TEE confidential)</span></label>
                 <button onclick={() => openExternal('https://cloud.near.ai')} class="text-gold-dim hover:text-gold text-xs transition-colors">Get Key</button>
               </div>
               <div class="relative">
-                <input type="password" bind:value={nearaiKey} placeholder="NEAR.ai API key"
+                <input id="setup-nearai-key" type="password" bind:value={nearaiKey} placeholder="NEAR.ai API key"
                   class="w-full bg-surface text-ivory text-sm px-4 py-2.5 rounded border focus:outline-none transition-colors duration-300 selectable {nearaiValid ? 'border-positive/50' : 'border-border focus:border-gold-dim'}" />
                 {#if nearaiValid}
                   <div class="absolute right-3 top-1/2 -translate-y-1/2">
@@ -1110,10 +1111,11 @@
             />
             {#if messaging.whatsapp.enabled}
               <div class="ml-11 -mt-1 mb-1">
-                <label class="text-ivory-muted text-xs tracking-wider uppercase mb-1.5 block">
+                <label for="setup-whatsapp-phone" class="text-ivory-muted text-xs tracking-wider uppercase mb-1.5 block">
                   Your Phone Number <span class="text-gold">*</span>
                 </label>
                 <input
+                  id="setup-whatsapp-phone"
                   type="tel"
                   bind:value={whatsappPhone}
                   placeholder="+44..."
@@ -1150,10 +1152,11 @@
           <!-- Signal phone number -->
           {#if messaging.signal.enabled}
             <div class="ml-11 mt-2 mb-1">
-              <label class="text-ivory-muted text-xs tracking-wider uppercase mb-1.5 block">
+              <label for="setup-signal-phone" class="text-ivory-muted text-xs tracking-wider uppercase mb-1.5 block">
                 Signal Phone Number <span class="text-gold">*</span>
               </label>
               <input
+                id="setup-signal-phone"
                 type="tel"
                 bind:value={signalPhone}
                 placeholder="+44..."
@@ -1171,11 +1174,11 @@
               {#if messaging.telegram.enabled}
                 <div>
                   <div class="flex items-center justify-between mb-1.5">
-                    <label class="text-ivory-muted/70 text-xs">Telegram Bot Token</label>
+                    <label for="setup-telegram-token" class="text-ivory-muted/70 text-xs">Telegram Bot Token</label>
                     <button onclick={() => openExternal('https://t.me/BotFather')} class="text-gold-dim hover:text-gold text-xs transition-colors">@BotFather</button>
                   </div>
                   <div class="relative">
-                    <input type="password" bind:value={telegramToken} placeholder="123456:ABC-..."
+                    <input id="setup-telegram-token" type="password" bind:value={telegramToken} placeholder="123456:ABC-..."
                       class="w-full bg-surface text-ivory text-sm px-4 py-2.5 rounded border focus:outline-none transition-colors duration-300 selectable {telegramValid ? 'border-positive/50' : 'border-border focus:border-gold-dim'}" />
                     {#if telegramValid}
                       <div class="absolute right-3 top-1/2 -translate-y-1/2">
@@ -1188,11 +1191,11 @@
               {#if messaging.slack.enabled}
                 <div>
                   <div class="flex items-center justify-between mb-1.5">
-                    <label class="text-ivory-muted/70 text-xs">Slack Bot Token</label>
+                    <label for="setup-slack-token" class="text-ivory-muted/70 text-xs">Slack Bot Token</label>
                     <button onclick={() => openExternal('https://api.slack.com/apps')} class="text-gold-dim hover:text-gold text-xs transition-colors">Create App</button>
                   </div>
                   <div class="relative">
-                    <input type="password" bind:value={slackToken} placeholder="xoxb-..."
+                    <input id="setup-slack-token" type="password" bind:value={slackToken} placeholder="xoxb-..."
                       class="w-full bg-surface text-ivory text-sm px-4 py-2.5 rounded border focus:outline-none transition-colors duration-300 selectable {slackValid ? 'border-positive/50' : 'border-border focus:border-gold-dim'}" />
                     {#if slackValid}
                       <div class="absolute right-3 top-1/2 -translate-y-1/2">
@@ -1233,6 +1236,7 @@
               class="relative w-10 h-5 rounded-full transition-colors duration-200 flex-shrink-0 overflow-hidden"
               class:bg-accent={clawdtalkEnabled}
               class:bg-border={!clawdtalkEnabled}
+              aria-label="Toggle ClawdTalk voice calling"
             >
               <span
                 class="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-ivory transition-transform duration-200"
@@ -1261,10 +1265,11 @@
             <!-- API key input -->
             <div>
               <div class="flex items-center justify-between mb-1.5">
-                <label class="text-ivory-muted/70 text-xs">ClawdTalk API Key</label>
+                <label for="setup-clawdtalk-key" class="text-ivory-muted/70 text-xs">ClawdTalk API Key</label>
                 <button onclick={() => openExternal('https://clawdtalk.com')} class="text-gold-dim hover:text-gold text-xs transition-colors">Get Key</button>
               </div>
               <input
+                id="setup-clawdtalk-key"
                 type="password"
                 bind:value={clawdtalkKey}
                 placeholder="Your ClawdTalk API key"
@@ -1320,33 +1325,33 @@
             <div class="mt-3 p-4 rounded-lg border border-gold/20 bg-surface-raised space-y-3">
               <div class="grid grid-cols-2 gap-3">
                 <div>
-                  <label class="text-ivory-muted/70 text-[10px] tracking-wider uppercase block mb-1">Max Transaction (USD)</label>
-                  <input type="number" bind:value={guardrails.maxTransactionUsd} min="0" step="100"
+                  <label for="setup-max-transaction" class="text-ivory-muted/70 text-[10px] tracking-wider uppercase block mb-1">Max Transaction (USD)</label>
+                  <input id="setup-max-transaction" type="number" bind:value={guardrails.maxTransactionUsd} min="0" step="100"
                     class="w-full px-3 py-1.5 text-xs bg-surface border border-border rounded text-ivory focus:border-gold focus:outline-none" />
                 </div>
                 <div>
-                  <label class="text-ivory-muted/70 text-[10px] tracking-wider uppercase block mb-1">Daily Loss Limit (%)</label>
-                  <input type="number" bind:value={guardrails.dailyLossPercent} min="0" max="100" step="1"
+                  <label for="setup-daily-loss" class="text-ivory-muted/70 text-[10px] tracking-wider uppercase block mb-1">Daily Loss Limit (%)</label>
+                  <input id="setup-daily-loss" type="number" bind:value={guardrails.dailyLossPercent} min="0" max="100" step="1"
                     class="w-full px-3 py-1.5 text-xs bg-surface border border-border rounded text-ivory focus:border-gold focus:outline-none" />
                 </div>
                 <div>
-                  <label class="text-ivory-muted/70 text-[10px] tracking-wider uppercase block mb-1">Weekly Loss Limit (%)</label>
-                  <input type="number" bind:value={guardrails.weeklyLossPercent} min="0" max="100" step="1"
+                  <label for="setup-weekly-loss" class="text-ivory-muted/70 text-[10px] tracking-wider uppercase block mb-1">Weekly Loss Limit (%)</label>
+                  <input id="setup-weekly-loss" type="number" bind:value={guardrails.weeklyLossPercent} min="0" max="100" step="1"
                     class="w-full px-3 py-1.5 text-xs bg-surface border border-border rounded text-ivory focus:border-gold focus:outline-none" />
                 </div>
                 <div>
-                  <label class="text-ivory-muted/70 text-[10px] tracking-wider uppercase block mb-1">Max Daily Transactions</label>
-                  <input type="number" bind:value={guardrails.dailyTxLimit} min="1" step="1"
+                  <label for="setup-daily-tx-limit" class="text-ivory-muted/70 text-[10px] tracking-wider uppercase block mb-1">Max Daily Transactions</label>
+                  <input id="setup-daily-tx-limit" type="number" bind:value={guardrails.dailyTxLimit} min="1" step="1"
                     class="w-full px-3 py-1.5 text-xs bg-surface border border-border rounded text-ivory focus:border-gold focus:outline-none" />
                 </div>
                 <div>
-                  <label class="text-ivory-muted/70 text-[10px] tracking-wider uppercase block mb-1">Max Slippage (%)</label>
-                  <input type="number" bind:value={guardrails.maxSlippagePercent} min="0" max="100" step="0.5"
+                  <label for="setup-max-slippage" class="text-ivory-muted/70 text-[10px] tracking-wider uppercase block mb-1">Max Slippage (%)</label>
+                  <input id="setup-max-slippage" type="number" bind:value={guardrails.maxSlippagePercent} min="0" max="100" step="0.5"
                     class="w-full px-3 py-1.5 text-xs bg-surface border border-border rounded text-ivory focus:border-gold focus:outline-none" />
                 </div>
                 <div>
-                  <label class="text-ivory-muted/70 text-[10px] tracking-wider uppercase block mb-1">Max Concentration (%)</label>
-                  <input type="number" bind:value={guardrails.maxConcentrationPercent} min="0" max="100" step="5"
+                  <label for="setup-max-concentration" class="text-ivory-muted/70 text-[10px] tracking-wider uppercase block mb-1">Max Concentration (%)</label>
+                  <input id="setup-max-concentration" type="number" bind:value={guardrails.maxConcentrationPercent} min="0" max="100" step="5"
                     class="w-full px-3 py-1.5 text-xs bg-surface border border-border rounded text-ivory focus:border-gold focus:outline-none" />
                 </div>
               </div>

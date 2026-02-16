@@ -15,6 +15,7 @@
     children: Snippet;
   } = $props();
 
+  // svelte-ignore state_referenced_locally — intentional: prop sets initial state, then local state takes over
   let isExpanded = $state(expanded);
 </script>
 
@@ -23,6 +24,8 @@
   <button
     onclick={() => isExpanded = !isExpanded}
     class="w-full flex items-center justify-between px-5 py-4 hover:bg-surface-raised/50 transition-colors duration-200"
+    aria-label="Toggle {title} section"
+    aria-expanded={isExpanded}
   >
     <div class="flex items-center gap-3">
       <svg class="w-4.5 h-4.5 text-ivory-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">

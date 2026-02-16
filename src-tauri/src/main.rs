@@ -734,9 +734,14 @@ fn main() {
                 }
             });
 
-            // Start Activity Intelligence observer in background
+            // Start Activity Intelligence observer in background (only if enabled)
             let intel_handle = app.handle().clone();
-            intelligence::start_observer(intel_handle);
+            if config::read_current_config()
+                .map(|c| c.capabilities.activity_intelligence)
+                .unwrap_or(false)
+            {
+                intelligence::start_observer(intel_handle);
+            }
 
             Ok(())
         })

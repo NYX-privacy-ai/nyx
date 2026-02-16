@@ -761,8 +761,9 @@
         <SettingsSection title="Agent Identity" icon={icons.user} expanded={true}>
           <div class="space-y-3">
             <div>
-              <label class="text-ivory-muted text-xs tracking-wider uppercase mb-1.5 block">Agent Name</label>
+              <label for="settings-agent-name" class="text-ivory-muted text-xs tracking-wider uppercase mb-1.5 block">Agent Name</label>
               <input
+                id="settings-agent-name"
                 type="text"
                 bind:value={agentName}
                 placeholder="Nyx"
@@ -1028,33 +1029,33 @@
               <div class="p-4 rounded-lg border border-gold/20 bg-surface-raised space-y-3">
                 <div class="grid grid-cols-2 gap-3">
                   <div>
-                    <label class="text-ivory-muted/70 text-[10px] tracking-wider uppercase block mb-1">Max Transaction (USD)</label>
-                    <input type="number" bind:value={guardrails.maxTransactionUsd} min="0" step="100"
+                    <label for="s-max-tx" class="text-ivory-muted/70 text-[10px] tracking-wider uppercase block mb-1">Max Transaction (USD)</label>
+                    <input id="s-max-tx" type="number" bind:value={guardrails.maxTransactionUsd} min="0" step="100"
                       class="w-full px-3 py-1.5 text-xs bg-surface border border-border rounded text-ivory focus:border-gold focus:outline-none" />
                   </div>
                   <div>
-                    <label class="text-ivory-muted/70 text-[10px] tracking-wider uppercase block mb-1">Daily Loss Limit (%)</label>
-                    <input type="number" bind:value={guardrails.dailyLossPercent} min="0" max="100" step="1"
+                    <label for="s-daily-loss" class="text-ivory-muted/70 text-[10px] tracking-wider uppercase block mb-1">Daily Loss Limit (%)</label>
+                    <input id="s-daily-loss" type="number" bind:value={guardrails.dailyLossPercent} min="0" max="100" step="1"
                       class="w-full px-3 py-1.5 text-xs bg-surface border border-border rounded text-ivory focus:border-gold focus:outline-none" />
                   </div>
                   <div>
-                    <label class="text-ivory-muted/70 text-[10px] tracking-wider uppercase block mb-1">Weekly Loss Limit (%)</label>
-                    <input type="number" bind:value={guardrails.weeklyLossPercent} min="0" max="100" step="1"
+                    <label for="s-weekly-loss" class="text-ivory-muted/70 text-[10px] tracking-wider uppercase block mb-1">Weekly Loss Limit (%)</label>
+                    <input id="s-weekly-loss" type="number" bind:value={guardrails.weeklyLossPercent} min="0" max="100" step="1"
                       class="w-full px-3 py-1.5 text-xs bg-surface border border-border rounded text-ivory focus:border-gold focus:outline-none" />
                   </div>
                   <div>
-                    <label class="text-ivory-muted/70 text-[10px] tracking-wider uppercase block mb-1">Max Daily Transactions</label>
-                    <input type="number" bind:value={guardrails.dailyTxLimit} min="1" step="1"
+                    <label for="s-daily-txs" class="text-ivory-muted/70 text-[10px] tracking-wider uppercase block mb-1">Max Daily Transactions</label>
+                    <input id="s-daily-txs" type="number" bind:value={guardrails.dailyTxLimit} min="1" step="1"
                       class="w-full px-3 py-1.5 text-xs bg-surface border border-border rounded text-ivory focus:border-gold focus:outline-none" />
                   </div>
                   <div>
-                    <label class="text-ivory-muted/70 text-[10px] tracking-wider uppercase block mb-1">Max Slippage (%)</label>
-                    <input type="number" bind:value={guardrails.maxSlippagePercent} min="0" max="100" step="0.5"
+                    <label for="s-slippage" class="text-ivory-muted/70 text-[10px] tracking-wider uppercase block mb-1">Max Slippage (%)</label>
+                    <input id="s-slippage" type="number" bind:value={guardrails.maxSlippagePercent} min="0" max="100" step="0.5"
                       class="w-full px-3 py-1.5 text-xs bg-surface border border-border rounded text-ivory focus:border-gold focus:outline-none" />
                   </div>
                   <div>
-                    <label class="text-ivory-muted/70 text-[10px] tracking-wider uppercase block mb-1">Max Concentration (%)</label>
-                    <input type="number" bind:value={guardrails.maxConcentrationPercent} min="0" max="100" step="5"
+                    <label for="s-concentration" class="text-ivory-muted/70 text-[10px] tracking-wider uppercase block mb-1">Max Concentration (%)</label>
+                    <input id="s-concentration" type="number" bind:value={guardrails.maxConcentrationPercent} min="0" max="100" step="5"
                       class="w-full px-3 py-1.5 text-xs bg-surface border border-border rounded text-ivory focus:border-gold focus:outline-none" />
                   </div>
                 </div>
@@ -1088,10 +1089,11 @@
             />
             {#if messaging.whatsapp.enabled}
               <div class="ml-11 -mt-1">
-                <label class="text-ivory-muted text-xs tracking-wider uppercase mb-1.5 block">
+                <label for="s-whatsapp-phone" class="text-ivory-muted text-xs tracking-wider uppercase mb-1.5 block">
                   Your Phone Number <span class="text-gold">*</span>
                 </label>
                 <input
+                  id="s-whatsapp-phone"
                   type="tel"
                   bind:value={whatsappPhone}
                   placeholder="+44..."
@@ -1172,7 +1174,7 @@
 
                 <div>
                   <div class="flex items-center justify-between mb-1.5">
-                    <label class="text-ivory-muted text-xs">ClawdTalk API Key</label>
+                    <label for="s-clawdtalk-key" class="text-ivory-muted text-xs">ClawdTalk API Key</label>
                     <button
                       onclick={() => openExternal('https://clawdtalk.com')}
                       class="flex items-center gap-1 text-gold-dim hover:text-gold text-xs transition-colors"
@@ -1185,6 +1187,7 @@
                   </div>
                   <div class="flex gap-2">
                     <input
+                      id="s-clawdtalk-key"
                       type="password"
                       bind:value={clawdtalkApiKeyValue}
                       placeholder="Your ClawdTalk API key"
@@ -1443,6 +1446,7 @@
                 class="relative w-10 h-5 rounded-full transition-colors duration-200 flex-shrink-0 overflow-hidden"
                 class:bg-accent={emailEnabled}
                 class:bg-border={!emailEnabled}
+                aria-label="Toggle email intelligence"
               >
                 <span
                   class="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-ivory transition-transform duration-200"
@@ -1454,23 +1458,23 @@
             {#if emailEnabled}
               <div class="space-y-3 pl-0">
                 <div>
-                  <label class="text-ivory-muted/70 text-[10px] tracking-wider uppercase block mb-1">Timezone</label>
-                  <input type="text" bind:value={emailTimezone} placeholder="Europe/London"
+                  <label for="s-email-tz" class="text-ivory-muted/70 text-[10px] tracking-wider uppercase block mb-1">Timezone</label>
+                  <input id="s-email-tz" type="text" bind:value={emailTimezone} placeholder="Europe/London"
                     class="w-full px-3 py-1.5 text-xs bg-surface border border-border rounded text-ivory focus:border-gold-dim focus:outline-none selectable" />
                 </div>
                 <div class="grid grid-cols-2 gap-3">
                   <div>
-                    <label class="text-ivory-muted/70 text-[10px] tracking-wider uppercase block mb-1">Daily Digest Time</label>
+                    <label for="s-digest-hour" class="text-ivory-muted/70 text-[10px] tracking-wider uppercase block mb-1">Daily Digest Time</label>
                     <div class="flex items-center gap-1">
-                      <input type="number" bind:value={emailDigestHour} min="0" max="23" class="w-16 px-2 py-1.5 text-xs bg-surface border border-border rounded text-ivory text-center focus:border-gold-dim focus:outline-none" />
+                      <input id="s-digest-hour" type="number" bind:value={emailDigestHour} min="0" max="23" class="w-16 px-2 py-1.5 text-xs bg-surface border border-border rounded text-ivory text-center focus:border-gold-dim focus:outline-none" />
                       <span class="text-ivory-muted">:</span>
                       <input type="number" bind:value={emailDigestMinute} min="0" max="59" class="w-16 px-2 py-1.5 text-xs bg-surface border border-border rounded text-ivory text-center focus:border-gold-dim focus:outline-none" />
                     </div>
                   </div>
                   <div>
-                    <label class="text-ivory-muted/70 text-[10px] tracking-wider uppercase block mb-1">Triage Window</label>
+                    <label for="s-triage-start" class="text-ivory-muted/70 text-[10px] tracking-wider uppercase block mb-1">Triage Window</label>
                     <div class="flex items-center gap-1">
-                      <input type="number" bind:value={emailTriageStartHour} min="0" max="23" class="w-16 px-2 py-1.5 text-xs bg-surface border border-border rounded text-ivory text-center focus:border-gold-dim focus:outline-none" />
+                      <input id="s-triage-start" type="number" bind:value={emailTriageStartHour} min="0" max="23" class="w-16 px-2 py-1.5 text-xs bg-surface border border-border rounded text-ivory text-center focus:border-gold-dim focus:outline-none" />
                       <span class="text-ivory-muted text-xs">to</span>
                       <input type="number" bind:value={emailTriageEndHour} min="0" max="23" class="w-16 px-2 py-1.5 text-xs bg-surface border border-border rounded text-ivory text-center focus:border-gold-dim focus:outline-none" />
                     </div>
@@ -1509,6 +1513,7 @@
                   class="relative w-10 h-5 rounded-full transition-colors duration-200 flex-shrink-0 overflow-hidden"
                   class:bg-accent={capabilities[cap.key as keyof typeof capabilities]}
                   class:bg-border={!capabilities[cap.key as keyof typeof capabilities]}
+                  aria-label="Toggle {cap.name}"
                 >
                   <span
                     class="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-ivory transition-transform duration-200"

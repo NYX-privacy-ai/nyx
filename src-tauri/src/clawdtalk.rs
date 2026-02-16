@@ -7,6 +7,7 @@ use std::path::PathBuf;
 // Types
 // ---------------------------------------------------------------------------
 
+#[allow(dead_code)]
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ClawdTalkConfig {
     pub api_key: String,
