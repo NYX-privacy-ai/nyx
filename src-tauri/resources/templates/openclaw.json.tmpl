@@ -6,7 +6,15 @@
   },
   "tools": {
     "profile": "coding",
-    "deny": ["group:ui"],
+    "deny": [],
+    "web": {
+      "search": { "enabled": true },
+      "fetch": {
+        "enabled": true,
+        "maxChars": 50000,
+        "timeoutSeconds": 30
+      }
+    },
     "exec": {
       "host": "gateway",
       "ask": "off",
@@ -16,9 +24,6 @@
   },
   "sandbox": {
     "mode": "off"
-  },
-  "web": {
-    "enabled": true
   },
   "cron": {
     "enabled": true,

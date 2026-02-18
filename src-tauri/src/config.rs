@@ -1059,7 +1059,15 @@ pub fn write_openclaw_config(config: &SetupConfig) -> Result<(), String> {
         },
         "tools": {
             "profile": "coding",
-            "deny": ["group:ui"],
+            "deny": [],
+            "web": {
+                "search": { "enabled": true },
+                "fetch": {
+                    "enabled": true,
+                    "maxChars": 50000,
+                    "timeoutSeconds": 30
+                }
+            },
             "media": { "audio": { "enabled": has_openai } },
             "exec": {
                 "host": "gateway",
