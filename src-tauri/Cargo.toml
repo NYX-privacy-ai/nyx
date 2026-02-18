@@ -44,3 +44,6 @@ portable-pty = "0.8"
 
 # SQLite for Activity Intelligence (bundled compiles from source — no system dep)
 rusqlite = { version = "0.34", features = ["bundled"] }
+
+# URL parsing for browser navigation
+url = "2"

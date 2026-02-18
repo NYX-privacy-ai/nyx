@@ -578,6 +578,7 @@
           email_intelligence: true,
           communications: true,
           source_intelligence: true,
+          web_browsing: true,
           default_llm_provider: defaultLlmProvider,
           ollama_model: defaultLlmProvider === 'ollama' ? (selectedOllamaModel || null) : null,
         },

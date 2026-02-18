@@ -206,6 +206,9 @@ pub struct CapabilitiesConfig {
     /// Observe calendar + email patterns to offer proactive suggestions
     #[serde(default)]
     pub activity_intelligence: bool,
+    /// Agent-controlled web browsing (navigate sites, fill forms, book travel)
+    #[serde(default = "default_true")]
+    pub web_browsing: bool,
     /// Default LLM provider: "anthropic", "venice", "openai", "nearai", or "ollama"
     pub default_llm_provider: String,
     /// Selected Ollama model tag (e.g. "qwen3:4b"), None if not using local models
@@ -223,6 +226,7 @@ impl Default for CapabilitiesConfig {
             communications: true,
             source_intelligence: true,
             activity_intelligence: false, // opt-in — requires explicit enable
+            web_browsing: true, // on by default
             default_llm_provider: "anthropic".to_string(),
             ollama_model: None,
         }
@@ -304,6 +308,11 @@ pub struct SettingsSaveResult {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+/// Serde default helper for fields that default to true.
+fn default_true() -> bool {
+    true
+}
 
 /// Get the home directory.
 pub fn home_dir() -> PathBuf {
@@ -428,6 +437,10 @@ pub fn read_current_config() -> Result<SettingsConfig, String> {
             .get("CAPABILITY_ACTIVITY_INTEL")
             .map(|v| v == "true")
             .unwrap_or(false),
+        web_browsing: env
+            .get("CAPABILITY_WEB_BROWSING")
+            .map(|v| v == "true")
+            .unwrap_or(true),
         default_llm_provider: default_llm_provider.clone(),
         ollama_model: env.get("OLLAMA_MODEL")
             .filter(|v| !v.is_empty())
@@ -846,6 +859,7 @@ pub fn write_docker_env(config: &SetupConfig) -> Result<(), String> {
          CAPABILITY_COMMS={}\n\
          CAPABILITY_SOURCE_INTEL={}\n\
          CAPABILITY_ACTIVITY_INTEL={}\n\
+         CAPABILITY_WEB_BROWSING={}\n\
          DEFAULT_LLM_PROVIDER={}\n\
          OLLAMA_MODEL={}\n",
         m.gmail.enabled,
@@ -860,6 +874,7 @@ pub fn write_docker_env(config: &SetupConfig) -> Result<(), String> {
         caps.communications,
         caps.source_intelligence,
         caps.activity_intelligence,
+        caps.web_browsing,
         caps.default_llm_provider,
         caps.ollama_model.as_deref().unwrap_or(""),
     ));

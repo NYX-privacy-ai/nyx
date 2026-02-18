@@ -61,6 +61,7 @@
     communications: true,
     source_intelligence: true,
     activity_intelligence: false,
+    web_browsing: true,
   });
   let googleAuthenticated = $state(false);
   let ollamaModel = $state('');
@@ -220,6 +221,7 @@
         communications: c.communications,
         source_intelligence: c.source_intelligence,
         activity_intelligence: c.activity_intelligence ?? false,
+        web_browsing: c.web_browsing ?? true,
       };
       googleAuthenticated = config.google_authenticated;
       ollamaModel = c.ollama_model || '';
@@ -352,6 +354,7 @@
           communications: capabilities.communications,
           source_intelligence: capabilities.source_intelligence,
           activity_intelligence: capabilities.activity_intelligence,
+          web_browsing: capabilities.web_browsing,
           default_llm_provider: defaultLlmProvider,
           ollama_model: ollamaModel || null,
         };
@@ -1507,6 +1510,7 @@
               { key: 'communications', abbr: 'Co', name: 'Communications', desc: 'Telegram, WhatsApp, Slack with autonomy controls', color: 'bg-purple-500/15 text-purple-400' },
               { key: 'source_intelligence', abbr: 'Ve', name: 'Source Verification', desc: 'Credibility analysis and fact-checking', color: 'bg-cyan-500/15 text-cyan-300' },
               { key: 'activity_intelligence', abbr: 'Ai', name: 'Activity Intelligence', desc: 'Observe calendar & email patterns to offer proactive suggestions', color: 'bg-rose-500/15 text-rose-300' },
+              { key: 'web_browsing', abbr: 'Wb', name: 'Web Browsing', desc: 'Navigate websites, fill forms, book travel on your behalf', color: 'bg-indigo-500/15 text-indigo-400' },
             ] as cap}
               <div class="flex items-center justify-between px-3 py-2.5 rounded-lg bg-surface border border-border/50">
                 <div class="flex items-center gap-3">

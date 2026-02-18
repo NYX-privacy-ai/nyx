@@ -9,6 +9,7 @@ use nyx_lib::oneclick;
 use nyx_lib::wallet;
 
 // Tauri-only modules (UI-specific or have Tauri dependencies)
+mod browser;
 mod clawdtalk;
 mod claudecode;
 mod google;
@@ -530,6 +531,99 @@ fn clear_intelligence_data() -> Result<(), String> {
 }
 
 // ---------------------------------------------------------------------------
+// Web Browser (agent-controlled browsing)
+// ---------------------------------------------------------------------------
+
+#[tauri::command]
+fn browser_open(app: tauri::AppHandle) -> Result<(), String> {
+    browser::open(&app)
+}
+
+#[tauri::command]
+fn browser_close(app: tauri::AppHandle) -> Result<(), String> {
+    browser::close(&app)
+}
+
+#[tauri::command]
+fn browser_state() -> Result<Option<browser::BrowserState>, String> {
+    browser::get_state()
+}
+
+#[tauri::command]
+fn browser_navigate(app: tauri::AppHandle, url: String) -> Result<(), String> {
+    browser::navigate(&app, &url)
+}
+
+#[tauri::command]
+fn browser_go_back(app: tauri::AppHandle) -> Result<(), String> {
+    browser::go_back(&app)
+}
+
+#[tauri::command]
+fn browser_go_forward(app: tauri::AppHandle) -> Result<(), String> {
+    browser::go_forward(&app)
+}
+
+#[tauri::command]
+fn browser_click(app: tauri::AppHandle, selector: String) -> Result<String, String> {
+    browser::click(&app, &selector)
+}
+
+#[tauri::command]
+fn browser_type_text(app: tauri::AppHandle, selector: String, text: String) -> Result<String, String> {
+    browser::type_text(&app, &selector, &text)
+}
+
+#[tauri::command]
+fn browser_scroll(app: tauri::AppHandle, direction: String, amount: Option<i32>) -> Result<String, String> {
+    browser::scroll(&app, &direction, amount.unwrap_or(3))
+}
+
+#[tauri::command]
+fn browser_read_page(app: tauri::AppHandle) -> Result<String, String> {
+    browser::read_page(&app)
+}
+
+#[tauri::command]
+fn browser_read_links(app: tauri::AppHandle) -> Result<String, String> {
+    browser::read_links(&app)
+}
+
+#[tauri::command]
+fn browser_read_forms(app: tauri::AppHandle) -> Result<String, String> {
+    browser::read_forms(&app)
+}
+
+#[tauri::command]
+fn browser_select_option(app: tauri::AppHandle, selector: String, value: String) -> Result<String, String> {
+    browser::select_option(&app, &selector, &value)
+}
+
+#[tauri::command]
+fn browser_execute_js(app: tauri::AppHandle, code: String) -> Result<String, String> {
+    browser::execute_js(&app, &code)
+}
+
+#[tauri::command]
+async fn browser_execute_action(
+    app: tauri::AppHandle,
+    action: browser::BrowserAction,
+) -> Result<browser::BrowserActionResult, String> {
+    Ok(browser::execute_action(&app, &action).await)
+}
+
+/// Send a message with browser tool to the agent and run the full agent loop.
+#[tauri::command]
+async fn browser_send_message(
+    app: tauri::AppHandle,
+    message: String,
+    session_key: Option<String>,
+) -> Result<String, String> {
+    let key = session_key.unwrap_or_else(|| "agent:default:browse".to_string());
+    browser::send_browse_message(&app, message, key).await
+}
+
+// ---------------------------------------------------------------------------
 // ClawdTalk (voice calling)
 // ---------------------------------------------------------------------------
 
@@ -724,6 +818,23 @@ fn main() {
             get_autonomy_settings,
             set_autonomy_level,
             clear_intelligence_data,
+            // Web Browser
+            browser_open,
+            browser_close,
+            browser_state,
+            browser_navigate,
+            browser_go_back,
+            browser_go_forward,
+            browser_click,
+            browser_type_text,
+            browser_scroll,
+            browser_read_page,
+            browser_read_links,
+            browser_read_forms,
+            browser_select_option,
+            browser_execute_js,
+            browser_execute_action,
+            browser_send_message,
         ])
         .setup(|app| {
             let handle = app.handle().clone();
