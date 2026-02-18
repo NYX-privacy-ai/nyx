@@ -2,6 +2,41 @@
 
 All notable changes to Nyx will be documented in this file.
 
+## [1.3.0] — 2026-02-18
+
+### Added
+
+- **Web Browsing** — agent-controlled browser for navigating websites on the user's behalf (booking travel, ordering groceries, filling forms). Opens a secondary WebView window with real-time activity feed. 25-iteration safety limit. Never enters passwords or payment details.
+- **Activity Intelligence** — background observer that watches calendar and email patterns, learns from user behaviour, and offers proactive suggestions. Includes privacy controls and autonomy levels (Observe, Suggest, Draft, Autonomous).
+- **Claude Code Integration** — bidirectional MCP server for Claude Code to access Nyx capabilities, plus embedded terminal for direct Claude Code sessions.
+- **Browse Page** — new `/browse` route with URL bar, back/forward navigation, command input for natural language instructions, and real-time activity feed showing each action the agent takes.
+- **Web Browsing capability toggle** in Settings and Setup (default: enabled).
+- **Activity Intelligence restart notice** — amber banner prompts app restart when the feature is newly enabled.
+- **Browse nav item** in sidebar (globe icon).
+
+### Changed
+
+- Bumped internal version to 1.3.0.
+- Added `url` crate dependency for browser URL parsing.
+- Added `web_browsing` field to `CapabilitiesConfig` (default: true).
+
+### Fixed
+
+- Cleaned up all build warnings: zero Rust warnings, zero Svelte warnings.
+
+## [1.2.0] — 2026-02-16
+
+### Added
+
+- **Claude Code integration** — bidirectional MCP server + embedded terminal.
+- **Privacy Shield** — shielded ZEC via NEAR Intents cross-chain swaps.
+
+## [1.0.1] — 2026-02-14
+
+### Fixed
+
+- Minor bug fixes and stability improvements.
+
 ## [1.0.0] — 2026-02-13
 
 ### Added
