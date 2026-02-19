@@ -1,6 +1,7 @@
 # Changelog
 
 All notable changes to Nyx will be documented in this file.
+Format based on [Keep a Changelog](https://keepachangelog.com/); versions follow [Semantic Versioning](https://semver.org/).
 
 ## [1.3.1] — 2026-02-19
 
