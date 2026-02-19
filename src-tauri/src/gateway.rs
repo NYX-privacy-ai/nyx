@@ -111,7 +111,7 @@ fn save_folders(folders: &ChatFolders) -> Result<(), String> {
 // Chat API
 // ---------------------------------------------------------------------------
 
-/// Send a message to the OpenClaw gateway via HTTP API.
+/// Send a message to the agent gateway via HTTP API.
 pub async fn send_message(message: String) -> Result<String, String> {
     send_message_to_session(message, "agent:default:main".to_string()).await
 }

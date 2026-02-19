@@ -102,7 +102,21 @@ pub async fn install_gog(app_handle: &tauri::AppHandle) -> Result<String, String
             .map_err(|e| format!("Failed to set permissions: {}", e))?;
     }
 
-    // Verify it runs
+    // Also copy the Linux ARM64 binary (used inside the Docker container)
+    let bundled_gog_linux = resources_dir.join("bin/gog-linux-arm64");
+    let gog_linux_path = format!("{}/gog-linux-arm64", bin_dir);
+    if bundled_gog_linux.exists() {
+        std::fs::copy(&bundled_gog_linux, &gog_linux_path)
+            .map_err(|e| format!("Failed to copy gog-linux-arm64 binary: {}", e))?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&gog_linux_path, std::fs::Permissions::from_mode(0o755))
+                .map_err(|e| format!("Failed to set linux gog permissions: {}", e))?;
+        }
+    }
+
+    // Verify the macOS binary runs on the host
     let verify = Command::new(&gog_path)
         .args(["--version"])
         .output();

@@ -1346,7 +1346,7 @@
         <SettingsSection title="Claude Code" icon={icons.terminal}>
           <div class="space-y-4">
             <p class="text-ivory-muted/50 text-xs leading-relaxed">
-              Register Nyx as an MCP server so Claude Code can access your portfolio, chat with Atlas, verify sources, and more.
+              Register Nyx as an MCP server so Claude Code can access your portfolio, chat with the agent, verify sources, and more.
             </p>
 
             <!-- CLI status -->
@@ -1423,7 +1423,7 @@
                   <p class="text-ivory-muted/40 text-[10px] tracking-wider uppercase mb-1.5">Available Tools</p>
                   <div class="grid grid-cols-2 gap-1.5">
                     {#each [
-                      { name: 'nyx_chat', desc: 'Chat with Atlas' },
+                      { name: 'nyx_chat', desc: 'Chat with agent' },
                       { name: 'nyx_portfolio', desc: 'DeFi portfolio' },
                       { name: 'nyx_verify_source', desc: 'Source verification' },
                       { name: 'nyx_docker_status', desc: 'Container status' },

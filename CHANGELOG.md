@@ -2,6 +2,15 @@
 
 All notable changes to Nyx will be documented in this file.
 
+## [1.3.1] — 2026-02-19
+
+### Fixed
+
+- **Google Workspace broken in Docker** — macOS ARM64 `gog` binary was mounted into the Linux container since v1.0.0, causing `exec format error` on every Google command. Now bundles a separate Linux ARM64 `gog` binary (`gog-linux-arm64`) and mounts that into the container instead. Google Calendar, Gmail, Drive, Contacts, Sheets, and Docs all work correctly now.
+- **`gog` upgraded to v0.11.0** (from v0.9.0) as part of the Linux binary addition.
+- Setup (`config.rs`, `google.rs`) now copies both macOS and Linux gog binaries during initial install.
+- Docker Compose template updated to mount `gog-linux-arm64` for both gateway and CLI services.
+
 ## [1.3.0] — 2026-02-18
 
 ### Added

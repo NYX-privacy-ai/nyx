@@ -1273,7 +1273,7 @@ pub fn copy_resources(resources_dir: &Path) -> Result<(), String> {
         &home.join("openclaw/near-intents-helper"),
     )?;
 
-    // Copy gog binary
+    // Copy gog binaries — macOS native for host, Linux ARM64 for Docker container
     let gog_src = resources_dir.join("bin/gog");
     let gog_dst = home.join("openclaw/bin/gog");
     if gog_src.exists() {
@@ -1284,6 +1284,19 @@ pub fn copy_resources(resources_dir: &Path) -> Result<(), String> {
             use std::os::unix::fs::PermissionsExt;
             fs::set_permissions(&gog_dst, fs::Permissions::from_mode(0o755))
                 .map_err(|e| format!("Failed to set gog permissions: {}", e))?;
+        }
+    }
+    // Linux ARM64 gog binary — this is what gets mounted into the Docker container
+    let gog_linux_src = resources_dir.join("bin/gog-linux-arm64");
+    let gog_linux_dst = home.join("openclaw/bin/gog-linux-arm64");
+    if gog_linux_src.exists() {
+        fs::copy(&gog_linux_src, &gog_linux_dst)
+            .map_err(|e| format!("Failed to copy gog-linux-arm64: {}", e))?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            fs::set_permissions(&gog_linux_dst, fs::Permissions::from_mode(0o755))
+                .map_err(|e| format!("Failed to set gog-linux-arm64 permissions: {}", e))?;
         }
     }
 

@@ -24,7 +24,7 @@ use crate::portfolio_data;
 
 #[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
 pub struct ChatParams {
-    /// The message to send to the OpenClaw agent
+    /// The message to send to the Nyx agent
     pub message: String,
     /// Optional session key (default: "agent:default:main")
     pub session_key: Option<String>,
@@ -81,8 +81,8 @@ impl Default for NyxMcpServer {
 
 #[tool_router]
 impl NyxMcpServer {
-    /// Send a message to the OpenClaw agent (Atlas) and get a response.
-    #[tool(description = "Send a message to the OpenClaw agent (Atlas) and get a response. The agent can search the web, manage calendars, execute DeFi operations, and more.")]
+    /// Send a message to the Nyx agent and get a response.
+    #[tool(description = "Send a message to the Nyx agent and get a response. The agent can search the web, manage calendars, execute DeFi operations, and more.")]
     async fn nyx_chat(&self, Parameters(params): Parameters<ChatParams>) -> String {
         let session = params
             .session_key
@@ -116,8 +116,8 @@ impl NyxMcpServer {
         }
     }
 
-    /// Check the OpenClaw Docker container status.
-    #[tool(description = "Check the OpenClaw Docker container status including whether it's running, the image version, and system health.")]
+    /// Check the Nyx Docker container status.
+    #[tool(description = "Check the Nyx Docker container status including whether it's running, the image version, and system health.")]
     async fn nyx_docker_status(&self) -> String {
         match docker::check_docker_detailed().await {
             Ok(status) => serde_json::to_string_pretty(&status)
@@ -195,7 +195,7 @@ impl ServerHandler for NyxMcpServer {
     fn get_info(&self) -> ServerInfo {
         ServerInfo {
             instructions: Some(
-                "Nyx is a private AI chief of staff. Tools include chatting with the OpenClaw agent, \
+                "Nyx is a private AI chief of staff. Tools include chatting with the agent, \
                  DeFi portfolio data, source credibility analysis, Docker container status, \
                  session management, and ZEC privacy shield quotes."
                     .to_string(),

@@ -24,8 +24,8 @@ services:
       # NEAR Intents helper — mounted READ-ONLY (the skill invokes this)
       - ${HOME}/openclaw/near-intents-helper:/opt/near-intents-helper:ro
       # NOTE: secrets dir NO LONGER mounted — credentials injected via env vars
-      # gogcli binary — mounted READ-ONLY into PATH
-      - ${HOME}/openclaw/bin/gog:/usr/local/bin/gog:ro
+      # gogcli binary — Linux ARM64 build, mounted READ-ONLY into PATH
+      - ${HOME}/openclaw/bin/gog-linux-arm64:/usr/local/bin/gog:ro
       # jq binary — needed by ClawdTalk shell scripts
       - ${HOME}/openclaw/bin/jq:/usr/local/bin/jq:ro
       # gogcli config/token store
