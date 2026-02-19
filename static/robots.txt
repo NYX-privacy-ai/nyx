@@ -1,0 +1,4 @@
+# Nyx is a local desktop app served via Tauri WebView.
+# This robots.txt exists as a standard static asset placeholder.
+User-agent: *
+Disallow: /
