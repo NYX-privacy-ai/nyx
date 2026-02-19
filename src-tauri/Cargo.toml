@@ -2,6 +2,8 @@
 name = "nyx"
 version = "1.3.1"
 edition = "2021"
+description = "Tauri v2 backend for Nyx — Rust commands, plugin integrations, and resource bundling"
+license = "AGPL-3.0-or-later"
 
 [lib]
 name = "nyx_lib"
