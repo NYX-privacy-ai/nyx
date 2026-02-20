@@ -1,6 +1,6 @@
 services:
   openclaw-gateway:
-    image: ghcr.io/openclaw/openclaw:2026.2.9
+    image: ghcr.io/openclaw/openclaw:2026.2.17
     container_name: openclaw-gateway
     restart: unless-stopped
     init: true
@@ -9,9 +9,14 @@ services:
       - "127.0.0.1:18789:18789"
     read_only: true
     tmpfs:
-      - /tmp:size=100M,noexec,nosuid,nodev
+      # /tmp needs exec for Chrome crashpad handler
+      - /tmp:size=100M,nosuid,nodev
       - /var/tmp:size=50M,noexec,nosuid,nodev
       - /run:size=10M,noexec,nosuid,nodev
+      # Chrome needs writable dirs for NSS keystore and fontconfig cache (uid=1000 = node user)
+      - /home/node/.pki:size=10M,uid=1000,gid=1000
+      - /home/node/.cache/fontconfig:size=10M,uid=1000,gid=1000
+      - /var/cache/fontconfig:size=10M,uid=1000,gid=1000
     volumes:
       # Config and state
       - ${HOME}/.openclaw:/home/node/.openclaw:rw
@@ -30,24 +35,31 @@ services:
       - ${HOME}/openclaw/bin/jq:/usr/local/bin/jq:ro
       # gogcli config/token store
       - ${HOME}/.openclaw/gogcli:/home/node/.config/gogcli:rw
+      # Playwright browser binaries (Chromium for browser automation)
+      - ${HOME}/.openclaw/playwright:/home/node/.cache/ms-playwright:rw
+      # Chromium shared libraries (browser deps not in base image)
+      - ${HOME}/.openclaw/browser-libs:/usr/lib/chromium-libs:ro
       # Nyx DeFi state (portfolio, positions, strategy logs)
       - ${HOME}/.openclaw/defi-state:/home/node/.openclaw/defi-state:rw
-      # PATCH: fix false-positive billing error on wallet balances containing "402"
-      - ${HOME}/openclaw/patches/dist/pi-embedded-helpers-BMVq9N_Q.js:/app/dist/pi-embedded-helpers-BMVq9N_Q.js:ro
-      - ${HOME}/openclaw/patches/dist/pi-embedded-helpers-BirxUQcw.js:/app/dist/pi-embedded-helpers-BirxUQcw.js:ro
-      - ${HOME}/openclaw/patches/dist/pi-embedded-helpers-CCNP0B92.js:/app/dist/pi-embedded-helpers-CCNP0B92.js:ro
-      - ${HOME}/openclaw/patches/dist/pi-embedded-helpers-CZRIUwLy.js:/app/dist/pi-embedded-helpers-CZRIUwLy.js:ro
+      # NOTE: 402 billing-patch removed — file hashes changed in 2026.2.17.
+      # Monitor for recurrence; if needed, re-patch new file names.
     env_file:
       - docker.env
     environment:
-      - OPENCLAW_GATEWAY_BIND=0.0.0.0
+      - OPENCLAW_GATEWAY_BIND=localhost
       - OPENCLAW_CONFIG_PATH=/home/node/.openclaw/openclaw.json
+      - LD_LIBRARY_PATH=/usr/lib/chromium-libs
+      - http_proxy=http://egress-proxy:3128
+      - https_proxy=http://egress-proxy:3128
+      - no_proxy=localhost,127.0.0.1,signal-cli
       # Cross-chain support
       - CROSS_CHAIN_ENABLED=true
       - ONECLICK_API_URL=https://1click.chaindefuser.com/v0
       # Privacy: ZEC as default crypto layer
       - ZEC_PRIVACY_DEFAULT=true
-    command: ["node", "dist/index.js", "gateway", "--bind", "lan", "--port", "18789"]
+    depends_on:
+      - egress-proxy
+    command: ["sh", "-c", "rm -f /home/node/.openclaw/browser/*/user-data/Singleton* 2>/dev/null; exec node dist/index.js gateway --bind lan --port 18789"]
     user: "1000:1000"
     security_opt:
       - no-new-privileges:true
@@ -62,8 +74,34 @@ services:
     networks:
       - openclaw-net
 
+  # ── Egress Proxy (domain allowlist) ──
+  egress-proxy:
+    image: ubuntu/squid:latest
+    container_name: egress-proxy
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /var/spool/squid:size=100M
+      - /var/log/squid:size=50M
+      - /run:size=10M
+    volumes:
+      - ${HOME}/openclaw/squid.conf:/etc/squid/squid.conf:ro
+    cap_drop:
+      - ALL
+    cap_add:
+      - SETUID
+      - SETGID
+      - NET_BIND_SERVICE
+    mem_limit: 256m
+    cpus: 0.5
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
+    networks:
+      - openclaw-net
+
   openclaw-cli:
-    image: ghcr.io/openclaw/openclaw:2026.2.9
+    image: ghcr.io/openclaw/openclaw:2026.2.17
     container_name: openclaw-cli
     profiles: ["cli"]
     stdin_open: true
@@ -78,15 +116,10 @@ services:
       - ${HOME}/openclaw/local-skills:/home/node/.openclaw/local-skills:ro
       - ${HOME}/openclaw/local-skills/clawdtalk:/home/node/.openclaw/local-skills/clawdtalk:rw
       - ${HOME}/openclaw/near-intents-helper:/opt/near-intents-helper:ro
-      - ${HOME}/openclaw/bin/gog:/usr/local/bin/gog:ro
+      - ${HOME}/openclaw/bin/gog-linux-arm64:/usr/local/bin/gog:ro
       - ${HOME}/openclaw/bin/jq:/usr/local/bin/jq:ro
       - ${HOME}/.openclaw/gogcli:/home/node/.config/gogcli:rw
       - ${HOME}/.openclaw/defi-state:/home/node/.openclaw/defi-state:rw
-      # PATCH: fix false-positive billing error on wallet balances containing "402"
-      - ${HOME}/openclaw/patches/dist/pi-embedded-helpers-BMVq9N_Q.js:/app/dist/pi-embedded-helpers-BMVq9N_Q.js:ro
-      - ${HOME}/openclaw/patches/dist/pi-embedded-helpers-BirxUQcw.js:/app/dist/pi-embedded-helpers-BirxUQcw.js:ro
-      - ${HOME}/openclaw/patches/dist/pi-embedded-helpers-CCNP0B92.js:/app/dist/pi-embedded-helpers-CCNP0B92.js:ro
-      - ${HOME}/openclaw/patches/dist/pi-embedded-helpers-CZRIUwLy.js:/app/dist/pi-embedded-helpers-CZRIUwLy.js:ro
     env_file:
       - docker.env
     environment:

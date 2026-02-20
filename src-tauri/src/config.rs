@@ -243,6 +243,7 @@ pub struct SetupConfig {
     pub openai_key: Option<String>,
     pub venice_key: Option<String>,
     pub nearai_key: Option<String>,
+    pub perplexity_key: Option<String>,
     pub telegram_token: Option<String>,
     pub slack_token: Option<String>,
     pub whatsapp_phone: Option<String>,
@@ -269,6 +270,7 @@ pub struct SettingsConfig {
     pub has_openai_key: bool,
     pub has_venice_key: bool,
     pub has_nearai_key: bool,
+    pub has_perplexity_key: bool,
     pub has_telegram_token: bool,
     pub has_slack_token: bool,
     pub whatsapp_phone: Option<String>,
@@ -289,6 +291,7 @@ pub struct SettingsUpdate {
     pub openai_key: Option<String>,
     pub venice_key: Option<String>,
     pub nearai_key: Option<String>,
+    pub perplexity_key: Option<String>,
     pub telegram_token: Option<String>,
     pub slack_token: Option<String>,
     pub whatsapp_phone: Option<String>,
@@ -459,6 +462,7 @@ pub fn read_current_config() -> Result<SettingsConfig, String> {
         has_openai_key: has_key("OPENAI_API_KEY"),
         has_venice_key: has_key("VENICE_API_KEY"),
         has_nearai_key: has_key("NEARAI_API_KEY"),
+        has_perplexity_key: has_key("PERPLEXITY_API_KEY"),
         has_telegram_token: has_key("TELEGRAM_BOT_TOKEN"),
         has_slack_token: has_key("SLACK_BOT_TOKEN"),
         whatsapp_phone,
@@ -564,6 +568,11 @@ pub fn save_settings(update: SettingsUpdate) -> Result<SettingsSaveResult, Strin
         Some(_) => { restart_required = true; None }
         None => env.get("NEARAI_API_KEY").filter(|v| !v.is_empty()).cloned(),
     };
+    let perplexity_key = match &update.perplexity_key {
+        Some(k) if !k.is_empty() => { restart_required = true; Some(k.clone()) }
+        Some(_) => { restart_required = true; None }
+        None => env.get("PERPLEXITY_API_KEY").filter(|v| !v.is_empty()).cloned(),
+    };
     let telegram_token = match &update.telegram_token {
         Some(t) if !t.is_empty() => { restart_required = true; Some(t.clone()) }
         Some(_) => { restart_required = true; None }
@@ -631,6 +640,7 @@ pub fn save_settings(update: SettingsUpdate) -> Result<SettingsSaveResult, Strin
         openai_key,
         venice_key,
         nearai_key,
+        perplexity_key,
         telegram_token,
         slack_token,
         whatsapp_phone,
@@ -745,6 +755,8 @@ pub fn create_directories() -> Result<(), String> {
         home.join("openclaw/patches/dist"),
         home.join(".openclaw/secrets"),
         home.join(".openclaw/cron"),
+        home.join(".openclaw/playwright"),
+        home.join(".openclaw/browser-libs"),
         home.join(".openclaw/defi-state/logs"),
         home.join(".openclaw/agents/default/sessions"),
     ];
@@ -778,7 +790,7 @@ pub fn write_docker_env(config: &SetupConfig) -> Result<(), String> {
     let mut content = format!(
         "# Nyx Docker Environment\n\
          OPENCLAW_GATEWAY_TOKEN={}\n\
-         OPENCLAW_IMAGE=ghcr.io/openclaw/openclaw:2026.2.9\n\
+         OPENCLAW_IMAGE=ghcr.io/openclaw/openclaw:2026.2.17\n\
          ANTHROPIC_API_KEY={}\n",
         config.gateway_token, config.anthropic_key
     );
@@ -791,6 +803,9 @@ pub fn write_docker_env(config: &SetupConfig) -> Result<(), String> {
     }
     if let Some(ref key) = config.nearai_key {
         content.push_str(&format!("NEARAI_API_KEY={}\n", key));
+    }
+    if let Some(ref key) = config.perplexity_key {
+        content.push_str(&format!("PERPLEXITY_API_KEY={}\n", key));
     }
     if let Some(ref token) = config.telegram_token {
         content.push_str(&format!("TELEGRAM_BOT_TOKEN={}\n", token));
@@ -901,6 +916,7 @@ pub fn write_openclaw_config(config: &SetupConfig) -> Result<(), String> {
     let home = home_dir();
     let path = home.join(".openclaw/openclaw.json");
 
+    let has_perplexity = config.perplexity_key.is_some();
     let has_telegram = config.telegram_token.is_some();
     let has_slack = config.slack_token.is_some();
     let has_openai = config.openai_key.is_some();
@@ -968,7 +984,7 @@ pub fn write_openclaw_config(config: &SetupConfig) -> Result<(), String> {
     }
 
     // Build dynamic lists based on capabilities
-    let mut safe_bins: Vec<&str> = vec!["ls", "find", "wc", "date", "openclaw", "curl", "cat", "grep", "head", "tail"];
+    let mut safe_bins: Vec<&str> = vec!["ls", "find", "wc", "date", "openclaw", "curl", "touch"];
     if caps.google_workspace {
         safe_bins.push("gog");
     }
@@ -1058,10 +1074,14 @@ pub fn write_openclaw_config(config: &SetupConfig) -> Result<(), String> {
             "providers": providers
         },
         "tools": {
-            "profile": "coding",
+            "profile": "full",
             "deny": [],
             "web": {
-                "search": { "enabled": true },
+                "search": if has_perplexity {
+                    json!({ "enabled": true, "provider": "perplexity" })
+                } else {
+                    json!({ "enabled": true })
+                },
                 "fetch": {
                     "enabled": true,
                     "maxChars": 50000,
@@ -1112,6 +1132,13 @@ pub fn write_openclaw_config(config: &SetupConfig) -> Result<(), String> {
             },
             "tailscale": { "mode": "off", "resetOnExit": false },
             "controlUi": { "enabled": false }
+        },
+        "browser": {
+            "enabled": true,
+            "headless": true,
+            "noSandbox": true,
+            "defaultProfile": "openclaw",
+            "executablePath": "/home/node/.cache/ms-playwright/chromium-1208/chrome-linux/chrome"
         },
         "skills": {
             "allowBundled": allow_bundled,
@@ -1326,6 +1353,14 @@ pub fn copy_resources(resources_dir: &Path) -> Result<(), String> {
     if compose_src.exists() {
         fs::copy(&compose_src, &compose_dst)
             .map_err(|e| format!("Failed to copy docker-compose.yml: {}", e))?;
+    }
+
+    // Copy squid.conf (egress proxy configuration)
+    let squid_src = resources_dir.join("squid.conf");
+    let squid_dst = home.join("openclaw/squid.conf");
+    if squid_src.exists() {
+        fs::copy(&squid_src, &squid_dst)
+            .map_err(|e| format!("Failed to copy squid.conf: {}", e))?;
     }
 
     // Copy start script (invoked by LaunchAgent at login)

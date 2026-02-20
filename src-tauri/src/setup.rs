@@ -72,6 +72,7 @@ pub async fn run_setup(
         openai_key,
         venice_key: None,
         nearai_key: None,
+        perplexity_key: None,
         telegram_token,
         slack_token: None,
         whatsapp_phone: None,
@@ -105,7 +106,7 @@ pub async fn run_setup(
     config::copy_resources(&resources_dir)?;
 
     // Step 6: Pull Docker image
-    docker::pull_image("ghcr.io/openclaw/openclaw:2026.2.9").await?;
+    docker::pull_image("ghcr.io/openclaw/openclaw:2026.2.17").await?;
 
     // Step 7: Start container
     docker::start_container().await?;
@@ -125,6 +126,7 @@ pub async fn run_setup_v2(
     openai_key: Option<String>,
     venice_key: Option<String>,
     nearai_key: Option<String>,
+    perplexity_key: Option<String>,
     telegram_token: Option<String>,
     slack_token: Option<String>,
     whatsapp_phone: Option<String>,
@@ -157,6 +159,7 @@ pub async fn run_setup_v2(
         openai_key,
         venice_key,
         nearai_key,
+        perplexity_key,
         telegram_token,
         slack_token,
         whatsapp_phone,
@@ -200,7 +203,7 @@ pub async fn run_setup_v2(
     }
 
     // Step 6: Pull Docker image
-    docker::pull_image("ghcr.io/openclaw/openclaw:2026.2.9").await?;
+    docker::pull_image("ghcr.io/openclaw/openclaw:2026.2.17").await?;
 
     // Step 7: Start container
     docker::start_container().await?;

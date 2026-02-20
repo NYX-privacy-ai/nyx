@@ -41,7 +41,7 @@ async fn install_docker() -> Result<String, String> {
 /// Pre-pull the OpenClaw Docker image in the background.
 #[tauri::command]
 async fn docker_prepull() -> Result<(), String> {
-    docker::pull_image("ghcr.io/openclaw/openclaw:2026.2.9").await
+    docker::pull_image("ghcr.io/openclaw/openclaw:2026.2.17").await
 }
 
 // ---------------------------------------------------------------------------
@@ -72,6 +72,7 @@ async fn run_setup_v2(
     openai_key: Option<String>,
     venice_key: Option<String>,
     nearai_key: Option<String>,
+    perplexity_key: Option<String>,
     telegram_token: Option<String>,
     slack_token: Option<String>,
     whatsapp_phone: Option<String>,
@@ -108,6 +109,7 @@ async fn run_setup_v2(
         openai_key,
         venice_key,
         nearai_key,
+        perplexity_key,
         telegram_token,
         slack_token,
         whatsapp_phone,

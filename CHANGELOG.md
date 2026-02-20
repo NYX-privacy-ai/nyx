@@ -3,6 +3,30 @@
 All notable changes to Nyx will be documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/); versions follow [Semantic Versioning](https://semver.org/).
 
+## [1.4.0] — 2026-02-20
+
+### Security
+
+- **Gateway bind hardened** — `OPENCLAW_GATEWAY_BIND` changed from `0.0.0.0` to `localhost`, preventing unintended network exposure.
+- **safeBins hardened** — removed `cat`, `grep`, `head`, `tail` (secret exfiltration vectors); added `touch`.
+- **Egress proxy** — all container web traffic now routes through a Squid proxy (`egress-proxy` service) for network-layer control.
+
+### Added
+
+- **Container browser automation** — Playwright Chromium support with tmpfs mounts for Chrome NSS keystore and fontconfig, volume mounts for Playwright binaries and shared libraries, and `LD_LIBRARY_PATH` for Chromium deps.
+- **Browser config in `openclaw.json`** — headless Chromium with `noSandbox` and explicit executable path for the containerised environment.
+- **`squid.conf` bundled** — egress proxy configuration deployed during setup.
+- **Browser-libs and Playwright directories** created during initial setup.
+
+### Changed
+
+- **OpenClaw image upgraded** from `2026.2.9` to `2026.2.17` across all references (Docker Compose, config template, setup, prepull).
+- **Docker Compose rewritten** — added `egress-proxy` service, Chrome tmpfs mounts, Playwright + browser-libs volumes, proxy environment variables, removed stale billing patches.
+
+### Removed
+
+- **Stale billing patches** — four `pi-embedded-helpers-*.js` patch files removed (file hashes changed in 2026.2.17).
+
 ## [1.3.1] — 2026-02-19
 
 ### Fixed

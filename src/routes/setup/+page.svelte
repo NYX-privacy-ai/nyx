@@ -260,6 +260,7 @@
   let openaiKey = $state('');
   let veniceKey = $state('');
   let nearaiKey = $state('');
+  let perplexityKey = $state('');
   let telegramToken = $state('');
   let slackToken = $state('');
   let whatsappPhone = $state('');
@@ -272,6 +273,7 @@
   let openaiValid = $derived(openaiKey.startsWith('sk-') && openaiKey.length > 20);
   let veniceValid = $derived(veniceKey.length > 10);
   let nearaiValid = $derived(nearaiKey.length > 10);
+  let perplexityValid = $derived(perplexityKey.startsWith('pplx-') && perplexityKey.length > 20);
   let telegramValid = $derived(/^\d+:[A-Za-z0-9_-]+$/.test(telegramToken));
   let slackValid = $derived(/^xoxb-[A-Za-z0-9-]+$/.test(slackToken));
   let whatsappPhoneValid = $derived(/^\+\d{7,15}$/.test(whatsappPhone));
@@ -544,6 +546,7 @@
         openaiKey: openaiKey || null,
         veniceKey: veniceKey || null,
         nearaiKey: nearaiKey || null,
+        perplexityKey: perplexityKey || null,
         telegramToken: telegramToken || null,
         slackToken: slackToken || null,
         whatsappPhone: whatsappPhone || null,
@@ -906,6 +909,23 @@
                 <input id="setup-nearai-key" type="password" bind:value={nearaiKey} placeholder="NEAR.ai API key"
                   class="w-full bg-surface text-ivory text-sm px-4 py-2.5 rounded border focus:outline-none transition-colors duration-300 selectable {nearaiValid ? 'border-positive/50' : 'border-border focus:border-gold-dim'}" />
                 {#if nearaiValid}
+                  <div class="absolute right-3 top-1/2 -translate-y-1/2">
+                    <svg class="w-4 h-4 text-positive/70" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M4.5 12.75l6 6 9-13.5" /></svg>
+                  </div>
+                {/if}
+              </div>
+            </div>
+
+            <!-- Perplexity — web search provider -->
+            <div class="space-y-1.5">
+              <div class="flex items-center justify-between">
+                <label for="setup-perplexity-key" class="text-ivory-muted/70 text-xs">Perplexity <span class="text-ivory-muted/30">(web search)</span></label>
+                <button onclick={() => openExternal('https://docs.perplexity.ai/guides/getting-started')} class="text-gold-dim hover:text-gold text-xs transition-colors">Get Key</button>
+              </div>
+              <div class="relative">
+                <input id="setup-perplexity-key" type="password" bind:value={perplexityKey} placeholder="pplx-..."
+                  class="w-full bg-surface text-ivory text-sm px-4 py-2.5 rounded border focus:outline-none transition-colors duration-300 selectable {perplexityValid ? 'border-positive/50' : 'border-border focus:border-gold-dim'}" />
+                {#if perplexityValid}
                   <div class="absolute right-3 top-1/2 -translate-y-1/2">
                     <svg class="w-4 h-4 text-positive/70" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M4.5 12.75l6 6 9-13.5" /></svg>
                   </div>

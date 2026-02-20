@@ -18,6 +18,7 @@
   let hasOpenaiKey = $state(false);
   let hasVeniceKey = $state(false);
   let hasNearaiKey = $state(false);
+  let hasPerplexityKey = $state(false);
   let hasTelegramToken = $state(false);
   let hasSlackToken = $state(false);
   let whatsappPhone = $state('');
@@ -174,6 +175,7 @@
       hasOpenaiKey = config.has_openai_key;
       hasVeniceKey = config.has_venice_key;
       hasNearaiKey = config.has_nearai_key;
+      hasPerplexityKey = config.has_perplexity_key;
       hasTelegramToken = config.has_telegram_token;
       hasSlackToken = config.has_slack_token;
       whatsappPhone = config.whatsapp_phone || '';
@@ -826,6 +828,14 @@
                   helpUrl="https://cloud.near.ai"
                   placeholder="NEAR.ai API key"
                   onSave={(key) => { hasNearaiKey = true; saveApiKey('nearai_key', key); }}
+                />
+                <ApiKeyStatus
+                  provider="Perplexity"
+                  description="Web Search"
+                  configured={hasPerplexityKey}
+                  helpUrl="https://docs.perplexity.ai/guides/getting-started"
+                  placeholder="pplx-..."
+                  onSave={(key) => { hasPerplexityKey = true; saveApiKey('perplexity_key', key); }}
                 />
               </div>
             </div>
