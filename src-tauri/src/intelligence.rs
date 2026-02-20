@@ -62,6 +62,7 @@ pub struct ActivityStats {
     pub contacts_tracked: u32,
     pub emails_observed_24h: u32,
     pub calendar_events_7d: u32,
+    pub messages_observed_24h: u32,
     pub suggestions_pending: u32,
     pub top_contacts: Vec<ContactSummary>,
     pub last_observation: Option<String>,
@@ -235,6 +236,21 @@ pub fn init_db() -> Result<(), String> {
             expires_at TEXT
         );
 
+        CREATE TABLE IF NOT EXISTS messaging_observations (
+            id INTEGER PRIMARY KEY,
+            message_id TEXT UNIQUE NOT NULL,
+            session_key TEXT NOT NULL,
+            role TEXT NOT NULL,
+            content_preview TEXT,
+            timestamp TEXT NOT NULL,
+            channel TEXT,
+            mentions_meeting INTEGER DEFAULT 0,
+            mentions_travel INTEGER DEFAULT 0,
+            mentions_food INTEGER DEFAULT 0,
+            mentions_deadline INTEGER DEFAULT 0,
+            observed_at TEXT NOT NULL
+        );
+
         CREATE TABLE IF NOT EXISTS autonomy_settings (
             activity_type TEXT PRIMARY KEY,
             level TEXT DEFAULT 'suggest',
@@ -259,6 +275,8 @@ pub fn init_db() -> Result<(), String> {
         CREATE INDEX IF NOT EXISTS idx_email_replied ON email_observations(is_inbound, replied);
         CREATE INDEX IF NOT EXISTS idx_calendar_start ON calendar_events(start_time);
         CREATE INDEX IF NOT EXISTS idx_suggestions_status ON suggestions(status);
+        CREATE INDEX IF NOT EXISTS idx_messaging_timestamp ON messaging_observations(timestamp);
+        CREATE INDEX IF NOT EXISTS idx_messaging_channel ON messaging_observations(channel);
         ",
     )
     .map_err(|e| format!("Failed to initialise intelligence schema: {}", e))?;
@@ -655,6 +673,197 @@ pub fn observe_email() -> Result<u32, String> {
 }
 
 // ---------------------------------------------------------------------------
+// Messaging observation (WhatsApp / Telegram / Signal via Atlas sessions)
+// ---------------------------------------------------------------------------
+
+/// JSONL entry from an OpenClaw session file.
+#[derive(Debug, Deserialize)]
+struct SessionJsonlEntry {
+    #[serde(rename = "type")]
+    entry_type: Option<String>,
+    id: Option<String>,
+    timestamp: Option<String>,
+    message: Option<SessionMessage>,
+}
+
+#[derive(Debug, Deserialize)]
+struct SessionMessage {
+    role: Option<String>,
+    content: Option<serde_json::Value>,
+    timestamp: Option<u64>,
+}
+
+/// Keyword categories for message classification.
+const MEETING_KEYWORDS: &[&str] = &[
+    "meeting", "meet", "lunch", "dinner", "coffee", "call", "zoom", "teams",
+    "appointment", "catch up", "sync", "drinks", "brunch", "breakfast",
+];
+const TRAVEL_KEYWORDS: &[&str] = &[
+    "flight", "train", "uber", "taxi", "airport", "hotel", "booking",
+    "travel", "trip", "journey", "drive", "pick up", "drop off",
+];
+const FOOD_KEYWORDS: &[&str] = &[
+    "restaurant", "reservation", "book a table", "dinner at", "lunch at",
+    "nopi", "dishoom", "brasserie", "bistro", "sushi", "pizza", "takeaway",
+];
+const DEADLINE_KEYWORDS: &[&str] = &[
+    "deadline", "due", "by friday", "by monday", "by tomorrow", "urgent",
+    "asap", "before", "submit", "expires", "expiring", "overdue",
+];
+
+/// Observe recent messaging from Atlas session files on disk.
+/// Reads the main session's JSONL file and extracts user messages
+/// from the last `hours` hours. Classifies each by topic keywords.
+pub fn observe_messaging(hours: u32) -> Result<u32, String> {
+    let home = std::env::var("HOME").unwrap_or_default();
+    let sessions_path = std::path::PathBuf::from(&home)
+        .join(".openclaw/agents/default/sessions/sessions.json");
+
+    let sessions_content = std::fs::read_to_string(&sessions_path)
+        .map_err(|e| format!("Failed to read sessions.json: {}", e))?;
+
+    let sessions: std::collections::HashMap<String, serde_json::Value> =
+        serde_json::from_str(&sessions_content)
+            .map_err(|e| format!("Failed to parse sessions.json: {}", e))?;
+
+    // Find the main session ID
+    let main_session_id = sessions
+        .get("agent:default:main")
+        .and_then(|v| v.get("sessionId"))
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| "Main session not found in sessions.json".to_string())?;
+
+    let session_file = std::path::PathBuf::from(&home)
+        .join(".openclaw/agents/default/sessions")
+        .join(format!("{}.jsonl", main_session_id));
+
+    if !session_file.exists() {
+        return Ok(0);
+    }
+
+    let content = std::fs::read_to_string(&session_file)
+        .map_err(|e| format!("Failed to read session file: {}", e))?;
+
+    // Calculate cutoff timestamp
+    let cutoff_secs = std::time::SystemTime::now()
+        .duration_since(std::time::SystemTime::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs()
+        .saturating_sub(hours as u64 * 3600);
+
+    let conn = open_db()?;
+    let now = now_iso();
+    let mut count = 0u32;
+
+    for line in content.lines() {
+        let entry: SessionJsonlEntry = match serde_json::from_str(line) {
+            Ok(e) => e,
+            Err(_) => continue,
+        };
+
+        // Only process message entries
+        if entry.entry_type.as_deref() != Some("message") {
+            continue;
+        }
+
+        let message = match &entry.message {
+            Some(m) => m,
+            None => continue,
+        };
+
+        // Only process user messages (inbound from channels)
+        if message.role.as_deref() != Some("user") {
+            continue;
+        }
+
+        // Check timestamp — skip old messages
+        if let Some(ts_ms) = message.timestamp {
+            let ts_secs = ts_ms / 1000;
+            if ts_secs < cutoff_secs {
+                continue;
+            }
+        }
+
+        let msg_id = match &entry.id {
+            Some(id) => id.clone(),
+            None => continue,
+        };
+
+        let timestamp = entry.timestamp.clone().unwrap_or_else(|| now.clone());
+
+        // Extract text content from the message
+        let text = extract_message_text(&message.content);
+        if text.is_empty() {
+            continue;
+        }
+
+        // Truncate for storage (keep first 200 chars as preview)
+        let preview = if text.len() > 200 {
+            format!("{}...", &text[..text.char_indices().nth(200).map(|(i, _)| i).unwrap_or(text.len())])
+        } else {
+            text.clone()
+        };
+
+        let text_lower = text.to_lowercase();
+
+        // Classify message by keyword presence
+        let mentions_meeting = MEETING_KEYWORDS.iter().any(|k| text_lower.contains(k)) as i32;
+        let mentions_travel = TRAVEL_KEYWORDS.iter().any(|k| text_lower.contains(k)) as i32;
+        let mentions_food = FOOD_KEYWORDS.iter().any(|k| text_lower.contains(k)) as i32;
+        let mentions_deadline = DEADLINE_KEYWORDS.iter().any(|k| text_lower.contains(k)) as i32;
+
+        // Insert (skip if already seen)
+        let result = conn.execute(
+            "INSERT OR IGNORE INTO messaging_observations
+             (message_id, session_key, role, content_preview, timestamp, channel,
+              mentions_meeting, mentions_travel, mentions_food, mentions_deadline, observed_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+            params![
+                msg_id,
+                "agent:default:main",
+                "user",
+                preview,
+                timestamp,
+                "messaging", // Generic — channel metadata not in session JSONL
+                mentions_meeting,
+                mentions_travel,
+                mentions_food,
+                mentions_deadline,
+                now,
+            ],
+        );
+
+        if let Ok(rows) = result {
+            if rows > 0 {
+                count += 1;
+            }
+        }
+    }
+
+    Ok(count)
+}
+
+/// Extract plain text from a message content field (handles both string and array formats).
+fn extract_message_text(content: &Option<serde_json::Value>) -> String {
+    match content {
+        Some(serde_json::Value::String(s)) => s.clone(),
+        Some(serde_json::Value::Array(arr)) => {
+            arr.iter()
+                .filter_map(|item| {
+                    if item.get("type")?.as_str()? == "text" {
+                        item.get("text")?.as_str().map(String::from)
+                    } else {
+                        None
+                    }
+                })
+                .collect::<Vec<_>>()
+                .join(" ")
+        }
+        _ => String::new(),
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Contact upsert
 // ---------------------------------------------------------------------------
 
@@ -1014,6 +1223,14 @@ pub fn get_activity_stats() -> Result<ActivityStats, String> {
         )
         .unwrap_or(0);
 
+    let messages_observed_24h: u32 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM messaging_observations WHERE observed_at >= ?1",
+            params![one_day_ago],
+            |row| row.get(0),
+        )
+        .unwrap_or(0);
+
     let suggestions_pending: u32 = conn
         .query_row(
             "SELECT COUNT(*) FROM suggestions WHERE status = 'pending'",
@@ -1028,6 +1245,8 @@ pub fn get_activity_stats() -> Result<ActivityStats, String> {
                 SELECT observed_at FROM calendar_events
                 UNION ALL
                 SELECT observed_at FROM email_observations
+                UNION ALL
+                SELECT observed_at FROM messaging_observations
             )",
             [],
             |row| row.get(0),
@@ -1040,6 +1259,7 @@ pub fn get_activity_stats() -> Result<ActivityStats, String> {
         contacts_tracked,
         emails_observed_24h,
         calendar_events_7d,
+        messages_observed_24h,
         suggestions_pending,
         top_contacts,
         last_observation,
@@ -1646,6 +1866,7 @@ pub fn clear_all_data() -> Result<(), String> {
     conn.execute_batch(
         "DELETE FROM email_observations;
          DELETE FROM calendar_events;
+         DELETE FROM messaging_observations;
          DELETE FROM contacts;
          DELETE FROM suggestions;
          -- Reset autonomy counters but keep level settings
@@ -1675,12 +1896,15 @@ pub fn start_observer(app: AppHandle) {
             tokio::time::interval(tokio::time::Duration::from_secs(15 * 60));
         let mut email_interval =
             tokio::time::interval(tokio::time::Duration::from_secs(30 * 60));
+        let mut messaging_interval =
+            tokio::time::interval(tokio::time::Duration::from_secs(20 * 60));
         let mut suggestion_interval =
             tokio::time::interval(tokio::time::Duration::from_secs(60 * 60));
 
         // Tick once immediately to skip the first instant tick
         calendar_interval.tick().await;
         email_interval.tick().await;
+        messaging_interval.tick().await;
         suggestion_interval.tick().await;
 
         loop {
@@ -1716,6 +1940,23 @@ pub fn start_observer(app: AppHandle) {
                             }
                         }
                         Err(e) => eprintln!("[intelligence] Email observation failed: {}", e),
+                    }
+                }
+                _ = messaging_interval.tick() => {
+                    if !is_intelligence_enabled() {
+                        continue;
+                    }
+                    // Observe recent messaging from Atlas sessions (last 4 hours)
+                    match observe_messaging(4) {
+                        Ok(count) => {
+                            if count > 0 {
+                                let _ = app.emit("intelligence:update", serde_json::json!({
+                                    "source": "messaging",
+                                    "count": count,
+                                }));
+                            }
+                        }
+                        Err(e) => eprintln!("[intelligence] Messaging observation failed: {}", e),
                     }
                 }
                 _ = suggestion_interval.tick() => {
