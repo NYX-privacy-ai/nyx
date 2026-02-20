@@ -264,6 +264,42 @@ pub async fn get_quote_from_zec(
     .await
 }
 
+/// Execute a shield swap (any asset → ZEC) — live, not dry run.
+pub async fn execute_zec_shield(
+    from_asset: &str,
+    amount: &str,
+    zec_address: &str,
+    refund_to: &str,
+) -> Result<QuoteResponse, String> {
+    get_quote(
+        from_asset,
+        "nep141:zec.omft.near",
+        amount,
+        zec_address,
+        refund_to,
+        false, // live execution
+    )
+    .await
+}
+
+/// Execute an unshield swap (ZEC → any asset) — live, not dry run.
+pub async fn execute_zec_unshield(
+    to_asset: &str,
+    zec_amount: &str,
+    recipient: &str,
+    zec_refund: &str,
+) -> Result<QuoteResponse, String> {
+    get_quote(
+        "nep141:zec.omft.near",
+        to_asset,
+        zec_amount,
+        recipient,
+        zec_refund,
+        false, // live execution
+    )
+    .await
+}
+
 /// Get the status of a swap.
 pub async fn get_status(swap_id: &str) -> Result<SwapStatus, String> {
     let client = reqwest::Client::new();

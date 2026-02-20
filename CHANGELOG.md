@@ -18,14 +18,32 @@ Format based on [Keep a Changelog](https://keepachangelog.com/); versions follow
 - **`squid.conf` bundled** — egress proxy configuration deployed during setup.
 - **Browser-libs and Playwright directories** created during initial setup.
 
+### Added
+
+- **Perplexity web search** — setup wizard and settings page support for Perplexity API key; web search provider auto-configured when key is present.
+- **Privacy Shield execution** — "Shield Now" and "Convert Now" buttons are now fully functional, executing live ZEC shield/unshield swaps via NEAR Intents.
+- **Signal messaging** — Signal channel config now persists through setup, settings, and docker.env (previously silently dropped).
+- **Messaging autonomy persistence** — channel autonomy levels (DraftOnly, SendWithConfirm, Autonomous) now saved to and read from docker.env.
+- **NEAR credentials in docker.env** — `NEAR_ACCOUNT_ID`, `NEAR_NETWORK_ID`, and `SOLVER_RELAY_URL` written automatically for the active NEAR wallet.
+- **Min Health Factor** input added to custom guardrails editor in setup wizard.
+- **Auto-paste** now detects Perplexity (`pplx-`) API keys.
+- **Default LLM model** — `agents.defaults.model` set in openclaw.json based on the selected provider.
+- **Slack skill** added to `skills.allowBundled` when Slack token is configured.
+
 ### Changed
 
 - **OpenClaw image upgraded** from `2026.2.9` to `2026.2.17` across all references (Docker Compose, config template, setup, prepull).
-- **Docker Compose rewritten** — added `egress-proxy` service, Chrome tmpfs mounts, Playwright + browser-libs volumes, proxy environment variables, removed stale billing patches.
+- **Docker Compose rewritten** — added `egress-proxy` service, Chrome tmpfs mounts, Playwright + browser-libs volumes, proxy environment variables.
+- **ClawdTalk ordering** — voice calling configured before main setup so safeBins and skill entries are included in initial openclaw.json.
+- **LLM provider validation** — setup wizard now requires the selected default provider to have a valid API key before proceeding.
+- **BigInt precision** — privacy shield amount conversion uses `BigInt(10) ** BigInt(decimals)` to avoid float precision loss for high-decimal assets.
+- **Dashboard navigation** uses SvelteKit `goto()` instead of `window.location.href`.
+- **SaveBar reactivity** — `restartRequired` uses `$derived.by()` for correct reactive computation.
+- **Dashboard portfolio** — `get_portfolio` called on mount to populate positions, allocation, and health data.
 
-### Removed
+### Fixed
 
-- **Stale billing patches** — four `pi-embedded-helpers-*.js` patch files removed (file hashes changed in 2026.2.17).
+- **Billing patches updated** — four `pi-embedded-helpers-*.js` patch files replaced with hashes matching the 2026.2.17 image.
 
 ## [1.3.1] — 2026-02-19
 

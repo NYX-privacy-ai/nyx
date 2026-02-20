@@ -328,6 +328,31 @@ async fn get_zec_unshield_quote(
     oneclick::get_quote_from_zec(&to_asset, &zec_amount, &recipient, &zec_refund).await
 }
 
+/// Execute a shield swap (any supported asset → shielded ZEC). Live, not dry run.
+#[tauri::command]
+async fn execute_zec_shield(
+    from_asset: String,
+    amount: String,
+) -> Result<oneclick::QuoteResponse, String> {
+    let zec_address = config::get_zec_address()
+        .ok_or_else(|| "No ZEC address configured. Add a ZEC wallet in Settings.".to_string())?;
+    let refund_to = config::get_near_account()
+        .unwrap_or_else(|| "nyx.near".to_string());
+    oneclick::execute_zec_shield(&from_asset, &amount, &zec_address, &refund_to).await
+}
+
+/// Execute an unshield swap (ZEC → any supported asset). Live, not dry run.
+#[tauri::command]
+async fn execute_zec_unshield(
+    to_asset: String,
+    zec_amount: String,
+    recipient: String,
+) -> Result<oneclick::QuoteResponse, String> {
+    let zec_refund = config::get_zec_address()
+        .ok_or_else(|| "No ZEC address configured. Add a ZEC wallet in Settings.".to_string())?;
+    oneclick::execute_zec_unshield(&to_asset, &zec_amount, &recipient, &zec_refund).await
+}
+
 /// Get the list of assets that can be shielded to ZEC.
 #[tauri::command]
 fn get_shieldable_assets() -> Vec<oneclick::ShieldableAsset> {
@@ -777,6 +802,8 @@ fn main() {
             get_zec_shield_quote,
             get_zec_unshield_quote,
             get_shieldable_assets,
+            execute_zec_shield,
+            execute_zec_unshield,
             // Container
             docker_start,
             docker_stop,

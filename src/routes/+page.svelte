@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
+  import { goto } from '$app/navigation';
 
   // Portfolio data — populated via Tauri IPC from portfolio.rs after setup
   // Shows empty state until container is running and data is available
@@ -96,15 +97,38 @@
 
       // Navigate based on suggestion type
       if (type === 'respond' || type === 'catch_up' || type === 'reachout') {
-        window.location.href = '/chat';
+        goto('/chat');
       } else if (type === 'schedule_meeting') {
-        window.location.href = '/chat';
+        goto('/chat');
       }
     } catch {}
   }
 
+  async function loadPortfolio() {
+    try {
+      const { invoke } = await import('@tauri-apps/api/core');
+      const data: any = await invoke('get_portfolio');
+      if (data) {
+        portfolio = {
+          totalValue: data.total_value ?? 0,
+          change24h: data.change_24h ?? 0,
+          changeAmount: data.change_amount ?? 0,
+        };
+        positions = (data.positions ?? []).map((p: any) => ({
+          asset: p.asset, protocol: p.protocol, type: p.type,
+          amount: p.amount, value: p.value, apy: p.apy ?? '—',
+        }));
+        allocation = data.allocation ?? [];
+        activity = data.activity ?? [];
+        health = data.health ?? null;
+      }
+    } catch {
+      // Portfolio not available (container not running or no data yet)
+    }
+  }
+
   onMount(async () => {
-    await loadIntelligence();
+    await Promise.all([loadPortfolio(), loadIntelligence()]);
 
     // Listen for intelligence events
     try {

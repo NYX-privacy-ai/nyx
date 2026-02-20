@@ -145,6 +145,8 @@ pub struct MessagingConfig {
     pub whatsapp: ChannelConfig,
     pub telegram: ChannelConfig,
     pub slack: ChannelConfig,
+    #[serde(default)]
+    pub signal: ChannelConfig,
 }
 
 impl Default for MessagingConfig {
@@ -154,6 +156,7 @@ impl Default for MessagingConfig {
             whatsapp: ChannelConfig::default(),
             telegram: ChannelConfig::default(),
             slack: ChannelConfig::default(),
+            signal: ChannelConfig::default(),
         }
     }
 }
@@ -406,22 +409,34 @@ pub fn read_current_config() -> Result<SettingsConfig, String> {
     // Messaging
     let parse_bool = |k: &str| env.get(k).map_or(false, |v| v == "true");
 
+    let parse_autonomy = |k: &str| -> MessagingAutonomy {
+        match env.get(k).map(|s| s.as_str()) {
+            Some("SendWithConfirm") | Some("send_with_confirm") => MessagingAutonomy::SendWithConfirm,
+            Some("Autonomous") | Some("autonomous") => MessagingAutonomy::Autonomous,
+            _ => MessagingAutonomy::DraftOnly,
+        }
+    };
+
     let messaging = MessagingConfig {
         gmail: ChannelConfig {
             enabled: parse_bool("MESSAGING_GMAIL_ENABLED"),
-            autonomy: MessagingAutonomy::DraftOnly,
+            autonomy: parse_autonomy("MESSAGING_GMAIL_AUTONOMY"),
         },
         whatsapp: ChannelConfig {
             enabled: parse_bool("MESSAGING_WHATSAPP_ENABLED"),
-            autonomy: MessagingAutonomy::DraftOnly,
+            autonomy: parse_autonomy("MESSAGING_WHATSAPP_AUTONOMY"),
         },
         telegram: ChannelConfig {
             enabled: parse_bool("MESSAGING_TELEGRAM_ENABLED"),
-            autonomy: MessagingAutonomy::DraftOnly,
+            autonomy: parse_autonomy("MESSAGING_TELEGRAM_AUTONOMY"),
         },
         slack: ChannelConfig {
             enabled: parse_bool("MESSAGING_SLACK_ENABLED"),
-            autonomy: MessagingAutonomy::DraftOnly,
+            autonomy: parse_autonomy("MESSAGING_SLACK_AUTONOMY"),
+        },
+        signal: ChannelConfig {
+            enabled: parse_bool("MESSAGING_SIGNAL_ENABLED"),
+            autonomy: parse_autonomy("MESSAGING_SIGNAL_AUTONOMY"),
         },
     };
 
@@ -757,6 +772,7 @@ pub fn create_directories() -> Result<(), String> {
         home.join(".openclaw/cron"),
         home.join(".openclaw/playwright"),
         home.join(".openclaw/browser-libs"),
+        home.join(".openclaw/gogcli"),
         home.join(".openclaw/defi-state/logs"),
         home.join(".openclaw/agents/default/sessions"),
     ];
@@ -854,14 +870,34 @@ pub fn write_docker_env(config: &SetupConfig) -> Result<(), String> {
         ));
     }
 
-    // Messaging env vars
+    // NEAR credentials — injected as env vars (IronClaw boundary injection)
+    // Find the active NEAR wallet and write account ID + private key path
+    let active_near = config.wallets.iter()
+        .find(|w| matches!(w.chain, Chain::NEAR) && w.is_active);
+    if let Some(near_wallet) = active_near {
+        content.push_str(&format!(
+            "\n# NEAR credentials (boundary injection)\n\
+             NEAR_ACCOUNT_ID={}\n\
+             NEAR_NETWORK_ID=mainnet\n\
+             SOLVER_RELAY_URL=https://solver-relay.near.org\n",
+            near_wallet.address
+        ));
+    }
+
+    // Messaging env vars (with autonomy)
     let m = &config.messaging;
     content.push_str(&format!(
         "\n# Messaging\n\
          MESSAGING_GMAIL_ENABLED={}\n\
+         MESSAGING_GMAIL_AUTONOMY={:?}\n\
          MESSAGING_WHATSAPP_ENABLED={}\n\
+         MESSAGING_WHATSAPP_AUTONOMY={:?}\n\
          MESSAGING_TELEGRAM_ENABLED={}\n\
+         MESSAGING_TELEGRAM_AUTONOMY={:?}\n\
          MESSAGING_SLACK_ENABLED={}\n\
+         MESSAGING_SLACK_AUTONOMY={:?}\n\
+         MESSAGING_SIGNAL_ENABLED={}\n\
+         MESSAGING_SIGNAL_AUTONOMY={:?}\n\
          GOOGLE_AUTHENTICATED={}\n\
          \n# Privacy\n\
          ZEC_PRIVACY_DEFAULT=true\n\
@@ -877,10 +913,11 @@ pub fn write_docker_env(config: &SetupConfig) -> Result<(), String> {
          CAPABILITY_WEB_BROWSING={}\n\
          DEFAULT_LLM_PROVIDER={}\n\
          OLLAMA_MODEL={}\n",
-        m.gmail.enabled,
-        m.whatsapp.enabled,
-        m.telegram.enabled,
-        m.slack.enabled,
+        m.gmail.enabled, m.gmail.autonomy,
+        m.whatsapp.enabled, m.whatsapp.autonomy,
+        m.telegram.enabled, m.telegram.autonomy,
+        m.slack.enabled, m.slack.autonomy,
+        m.signal.enabled, m.signal.autonomy,
         config.google_authenticated,
         caps.defi_crypto,
         caps.travel,
@@ -1008,6 +1045,9 @@ pub fn write_openclaw_config(config: &SetupConfig) -> Result<(), String> {
     if caps.google_workspace {
         allow_bundled.push("gog");
     }
+    if config.slack_token.is_some() {
+        allow_bundled.push("slack");
+    }
 
     let mut skill_entries = serde_json::Map::new();
     if caps.defi_crypto {
@@ -1050,10 +1090,21 @@ pub fn write_openclaw_config(config: &SetupConfig) -> Result<(), String> {
         }));
     }
 
+    // Resolve the default model based on provider
+    let default_model = match default_provider.as_str() {
+        "anthropic" => "claude-sonnet-4-20250514",
+        "openai" => "gpt-4o",
+        "venice" => "llama-3.3-70b",
+        "nearai" => "qwen3-30b-a3b",
+        "ollama" => caps.ollama_model.as_deref().unwrap_or("qwen3:4b"),
+        _ => "claude-sonnet-4-20250514",
+    };
+
     let config_json = json!({
         "agents": {
             "defaults": {
                 "workspace": "/home/node/.openclaw/workspace",
+                "model": default_model,
                 "maxConcurrent": 2,
                 "subagents": { "maxConcurrent": 4 },
                 "sandbox": { "mode": "off" }

@@ -43,6 +43,7 @@
     whatsapp: { enabled: false, autonomy: 'draft_only' },
     telegram: { enabled: false, autonomy: 'draft_only' },
     slack: { enabled: false, autonomy: 'draft_only' },
+    signal: { enabled: false, autonomy: 'draft_only' },
   });
 
   // Email notifications
@@ -141,7 +142,7 @@
 
   let hasChanges = $derived(snapshot !== '' && currentState() !== snapshot);
 
-  let restartRequired = $derived(() => {
+  let restartRequired = $derived.by(() => {
     if (!snapshot) return false;
     try {
       const snap = JSON.parse(snapshot);
@@ -202,6 +203,7 @@
         whatsapp: { enabled: m.whatsapp.enabled, autonomy: mapAutonomy(m.whatsapp.autonomy) },
         telegram: { enabled: m.telegram.enabled, autonomy: mapAutonomy(m.telegram.autonomy) },
         slack: { enabled: m.slack.enabled, autonomy: mapAutonomy(m.slack.autonomy) },
+        signal: { enabled: m.signal?.enabled ?? false, autonomy: mapAutonomy(m.signal?.autonomy) },
       };
 
       // Email
@@ -328,6 +330,7 @@
           whatsapp: { enabled: messaging.whatsapp.enabled, autonomy: mapAutonomyToEnum(messaging.whatsapp.autonomy) },
           telegram: { enabled: messaging.telegram.enabled, autonomy: mapAutonomyToEnum(messaging.telegram.autonomy) },
           slack: { enabled: messaging.slack.enabled, autonomy: mapAutonomyToEnum(messaging.slack.autonomy) },
+          signal: { enabled: messaging.signal.enabled, autonomy: mapAutonomyToEnum(messaging.signal.autonomy) },
         };
       }
 

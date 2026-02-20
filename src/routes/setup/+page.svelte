@@ -281,6 +281,15 @@
   // At least one LLM provider key must be valid, or user has selected Ollama (will download in Step 5)
   let hasAnyLlmKey = $derived(anthropicValid || openaiValid || veniceValid || nearaiValid || defaultLlmProvider === 'ollama');
 
+  // Validate that the selected default provider has a corresponding key
+  let defaultProviderHasKey = $derived(
+    (defaultLlmProvider === 'anthropic' && anthropicValid) ||
+    (defaultLlmProvider === 'openai' && openaiValid) ||
+    (defaultLlmProvider === 'venice' && veniceValid) ||
+    (defaultLlmProvider === 'nearai' && nearaiValid) ||
+    (defaultLlmProvider === 'ollama')
+  );
+
   let anthropicValidating = $state(false);
   let anthropicValidated = $state(false);
   let anthropicValidationError = $state('');
@@ -300,6 +309,9 @@
       e.preventDefault();
     } else if (text.startsWith('xoxb-') && !slackToken) {
       slackToken = text;
+      e.preventDefault();
+    } else if (text.startsWith('pplx-') && !perplexityKey) {
+      perplexityKey = text;
       e.preventDefault();
     }
   }
@@ -536,6 +548,16 @@
         signal: { enabled: messaging.signal.enabled, autonomy: autonomyToRust(messaging.signal.autonomy) },
       };
 
+      // Configure ClawdTalk BEFORE writing main config so safeBins/skills are included
+      if (clawdtalkEnabled && clawdtalkKey) {
+        provisionStatus = 'Configuring voice calling...';
+        try {
+          await invoke('clawdtalk_configure', { apiKey: clawdtalkKey });
+        } catch {
+          console.warn('ClawdTalk configuration failed — can be set up later in Settings');
+        }
+      }
+
       provisionStatus = imagePullDone
         ? 'Writing configuration...'
         : 'Downloading container image & writing configuration — this may take a few minutes...';
@@ -587,17 +609,6 @@
         },
       });
 
-      // Configure ClawdTalk voice calling if API key was provided
-      if (clawdtalkEnabled && clawdtalkKey) {
-        provisionStatus = 'Configuring voice calling...';
-        try {
-          await invoke('clawdtalk_configure', { apiKey: clawdtalkKey });
-        } catch {
-          // Non-blocking — voice is optional
-          console.warn('ClawdTalk configuration failed — can be set up later in Settings');
-        }
-      }
-
       provisionStatus = 'Setup complete!';
       setTimeout(() => {
         step = 4;
@@ -622,7 +633,7 @@
         if (defaultLlmProvider === 'ollama') {
           return hasLocalModel; // Must download at least one model
         }
-        return hasAnyLlmKey;
+        return hasAnyLlmKey && defaultProviderHasKey;
       }
       default: return true;
     }
@@ -1373,6 +1384,11 @@
                 <div>
                   <label for="setup-max-concentration" class="text-ivory-muted/70 text-[10px] tracking-wider uppercase block mb-1">Max Concentration (%)</label>
                   <input id="setup-max-concentration" type="number" bind:value={guardrails.maxConcentrationPercent} min="0" max="100" step="5"
+                    class="w-full px-3 py-1.5 text-xs bg-surface border border-border rounded text-ivory focus:border-gold focus:outline-none" />
+                </div>
+                <div>
+                  <label for="setup-min-health" class="text-ivory-muted/70 text-[10px] tracking-wider uppercase block mb-1">Min Health Factor</label>
+                  <input id="setup-min-health" type="number" bind:value={guardrails.minHealthFactor} min="1" max="10" step="0.1"
                     class="w-full px-3 py-1.5 text-xs bg-surface border border-border rounded text-ivory focus:border-gold focus:outline-none" />
                 </div>
               </div>

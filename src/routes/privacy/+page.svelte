@@ -56,6 +56,12 @@
   let unshieldLoading = $state(false);
   let unshieldError = $state('');
 
+  // Execution state
+  let shieldExecuting = $state(false);
+  let shieldSuccess = $state('');
+  let unshieldExecuting = $state(false);
+  let unshieldSuccess = $state('');
+
   // How it works — expanded
   let howItWorksOpen = $state(false);
 
@@ -113,7 +119,11 @@
       // Convert human amount to smallest unit
       const asset = assets.find(a => a.asset_id === shieldAsset);
       const decimals = asset?.decimals ?? 18;
-      const raw = BigInt(Math.round(parseFloat(shieldAmount) * (10 ** decimals))).toString();
+      // Use string math to avoid float precision loss for high-decimal assets
+      const parts = shieldAmount.split('.');
+      const intPart = parts[0] || '0';
+      const fracPart = (parts[1] || '').padEnd(decimals, '0').slice(0, decimals);
+      const raw = (BigInt(intPart) * (BigInt(10) ** BigInt(decimals)) + BigInt(fracPart)).toString();
       const result = await invoke('get_zec_shield_quote', {
         fromAsset: shieldAsset,
         amount: raw,
@@ -129,6 +139,57 @@
   // ---------------------------------------------------------------------------
   // Unshield quote
   // ---------------------------------------------------------------------------
+
+  async function executeShield() {
+    if (!shieldQuote) return;
+    shieldExecuting = true;
+    shieldError = '';
+    shieldSuccess = '';
+    try {
+      const { invoke } = await import('@tauri-apps/api/core');
+      const asset = assets.find(a => a.asset_id === shieldAsset);
+      const decimals = asset?.decimals ?? 18;
+      const parts = shieldAmount.split('.');
+      const intPart = parts[0] || '0';
+      const fracPart = (parts[1] || '').padEnd(decimals, '0').slice(0, decimals);
+      const raw = (BigInt(intPart) * (BigInt(10) ** BigInt(decimals)) + BigInt(fracPart)).toString();
+      await invoke('execute_zec_shield', {
+        fromAsset: shieldAsset,
+        amount: raw,
+      });
+      shieldSuccess = 'Shield transaction submitted successfully';
+      shieldQuote = null;
+      shieldAmount = '';
+    } catch (e: any) {
+      shieldError = typeof e === 'string' ? e : e?.message || 'Shield failed';
+    } finally {
+      shieldExecuting = false;
+    }
+  }
+
+  async function executeUnshield() {
+    if (!unshieldQuote) return;
+    unshieldExecuting = true;
+    unshieldError = '';
+    unshieldSuccess = '';
+    try {
+      const { invoke } = await import('@tauri-apps/api/core');
+      const raw = BigInt(Math.round(parseFloat(unshieldAmount) * 1e8)).toString();
+      await invoke('execute_zec_unshield', {
+        toAsset: unshieldAsset,
+        zecAmount: raw,
+        recipient: unshieldRecipient,
+      });
+      unshieldSuccess = 'Unshield transaction submitted successfully';
+      unshieldQuote = null;
+      unshieldAmount = '';
+      unshieldRecipient = '';
+    } catch (e: any) {
+      unshieldError = typeof e === 'string' ? e : e?.message || 'Unshield failed';
+    } finally {
+      unshieldExecuting = false;
+    }
+  }
 
   async function getUnshieldQuote() {
     if (!unshieldAmount || !unshieldAsset || !unshieldRecipient) return;
@@ -298,9 +359,23 @@
               <span class="text-ivory-muted text-xs">1% max</span>
             </div>
             <div class="border-t border-border/30 pt-3 mt-3">
-              <button class="w-full py-2.5 bg-gold/20 border border-gold text-gold text-sm font-medium tracking-wider uppercase rounded-lg hover:bg-gold/30 transition-all duration-300">
-                Shield Now
+              <button
+                onclick={executeShield}
+                disabled={shieldExecuting}
+                class="w-full py-2.5 bg-gold/20 border border-gold text-gold text-sm font-medium tracking-wider uppercase rounded-lg hover:bg-gold/30 transition-all duration-300 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {#if shieldExecuting}
+                  <span class="flex items-center justify-center gap-2">
+                    <span class="w-3.5 h-3.5 border-2 border-gold/30 border-t-gold rounded-full animate-spin"></span>
+                    Shielding...
+                  </span>
+                {:else}
+                  Shield Now
+                {/if}
               </button>
+              {#if shieldSuccess}
+                <p class="text-positive text-xs mt-2">{shieldSuccess}</p>
+              {/if}
             </div>
           </div>
         {/if}
@@ -419,9 +494,23 @@
               <span class="text-ivory-muted text-xs">1% max</span>
             </div>
             <div class="border-t border-border/30 pt-3 mt-3">
-              <button class="w-full py-2.5 bg-gold/20 border border-gold text-gold text-sm font-medium tracking-wider uppercase rounded-lg hover:bg-gold/30 transition-all duration-300">
-                Convert Now
+              <button
+                onclick={executeUnshield}
+                disabled={unshieldExecuting}
+                class="w-full py-2.5 bg-gold/20 border border-gold text-gold text-sm font-medium tracking-wider uppercase rounded-lg hover:bg-gold/30 transition-all duration-300 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {#if unshieldExecuting}
+                  <span class="flex items-center justify-center gap-2">
+                    <span class="w-3.5 h-3.5 border-2 border-gold/30 border-t-gold rounded-full animate-spin"></span>
+                    Converting...
+                  </span>
+                {:else}
+                  Convert Now
+                {/if}
               </button>
+              {#if unshieldSuccess}
+                <p class="text-positive text-xs mt-2">{unshieldSuccess}</p>
+              {/if}
             </div>
           </div>
         {/if}
