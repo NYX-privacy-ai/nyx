@@ -248,6 +248,8 @@ pub fn init_db() -> Result<(), String> {
             mentions_travel INTEGER DEFAULT 0,
             mentions_food INTEGER DEFAULT 0,
             mentions_deadline INTEGER DEFAULT 0,
+            mentions_commitment INTEGER DEFAULT 0,
+            mentions_urgency INTEGER DEFAULT 0,
             observed_at TEXT NOT NULL
         );
 
@@ -265,7 +267,9 @@ pub fn init_db() -> Result<(), String> {
             ('scheduling', 'suggest'),
             ('email_reply', 'observe'),
             ('follow_up', 'suggest'),
-            ('outreach', 'observe');
+            ('outreach', 'observe'),
+            ('promised_callback', 'suggest'),
+            ('urgent_unanswered', 'suggest');
 
         -- Indices for common queries
         CREATE INDEX IF NOT EXISTS idx_contacts_last_seen ON contacts(last_seen);
@@ -707,8 +711,19 @@ const FOOD_KEYWORDS: &[&str] = &[
     "nopi", "dishoom", "brasserie", "bistro", "sushi", "pizza", "takeaway",
 ];
 const DEADLINE_KEYWORDS: &[&str] = &[
-    "deadline", "due", "by friday", "by monday", "by tomorrow", "urgent",
-    "asap", "before", "submit", "expires", "expiring", "overdue",
+    "deadline", "due", "by friday", "by monday", "by tomorrow",
+    "before", "submit", "expires", "expiring", "overdue",
+];
+const COMMITMENT_KEYWORDS: &[&str] = &[
+    "i'll call", "i'll message", "i'll text", "i'll get back to",
+    "i'll reply", "i need to reply", "remind me to call", "remind me to message",
+    "i'll ring", "i said i'd", "i promised", "i'll follow up",
+    "i'll chase", "i'll drop them a", "i'll send them",
+];
+const URGENCY_KEYWORDS: &[&str] = &[
+    "urgent", "asap", "time-sensitive", "time sensitive", "by end of day",
+    "need to know", "eod", "critical", "immediately", "right away",
+    "as soon as possible", "??", "!!!",
 ];
 
 /// Observe recent messaging from Atlas session files on disk.
@@ -811,13 +826,16 @@ pub fn observe_messaging(hours: u32) -> Result<u32, String> {
         let mentions_travel = TRAVEL_KEYWORDS.iter().any(|k| text_lower.contains(k)) as i32;
         let mentions_food = FOOD_KEYWORDS.iter().any(|k| text_lower.contains(k)) as i32;
         let mentions_deadline = DEADLINE_KEYWORDS.iter().any(|k| text_lower.contains(k)) as i32;
+        let mentions_commitment = COMMITMENT_KEYWORDS.iter().any(|k| text_lower.contains(k)) as i32;
+        let mentions_urgency = URGENCY_KEYWORDS.iter().any(|k| text_lower.contains(k)) as i32;
 
         // Insert (skip if already seen)
         let result = conn.execute(
             "INSERT OR IGNORE INTO messaging_observations
              (message_id, session_key, role, content_preview, timestamp, channel,
-              mentions_meeting, mentions_travel, mentions_food, mentions_deadline, observed_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+              mentions_meeting, mentions_travel, mentions_food, mentions_deadline,
+              mentions_commitment, mentions_urgency, observed_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
             params![
                 msg_id,
                 "agent:default:main",
@@ -829,6 +847,8 @@ pub fn observe_messaging(hours: u32) -> Result<u32, String> {
                 mentions_travel,
                 mentions_food,
                 mentions_deadline,
+                mentions_commitment,
+                mentions_urgency,
                 now,
             ],
         );
