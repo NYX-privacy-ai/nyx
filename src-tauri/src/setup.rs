@@ -106,7 +106,7 @@ pub async fn run_setup(
     config::copy_resources(&resources_dir)?;
 
     // Step 6: Pull Docker image
-    docker::pull_image("ghcr.io/openclaw/openclaw:2026.2.17").await?;
+    docker::pull_image("ghcr.io/openclaw/openclaw:2026.2.21").await?;
 
     // Step 7: Start container
     docker::start_container().await?;
@@ -203,7 +203,7 @@ pub async fn run_setup_v2(
     }
 
     // Step 6: Pull Docker image
-    docker::pull_image("ghcr.io/openclaw/openclaw:2026.2.17").await?;
+    docker::pull_image("ghcr.io/openclaw/openclaw:2026.2.21").await?;
 
     // Step 7: Start container
     docker::start_container().await?;

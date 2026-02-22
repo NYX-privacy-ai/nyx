@@ -806,7 +806,7 @@ pub fn write_docker_env(config: &SetupConfig) -> Result<(), String> {
     let mut content = format!(
         "# Nyx Docker Environment\n\
          OPENCLAW_GATEWAY_TOKEN={}\n\
-         OPENCLAW_IMAGE=ghcr.io/openclaw/openclaw:2026.2.17\n\
+         OPENCLAW_IMAGE=ghcr.io/openclaw/openclaw:2026.2.21\n\
          ANTHROPIC_API_KEY={}\n",
         config.gateway_token, config.anthropic_key
     );

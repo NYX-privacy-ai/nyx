@@ -41,7 +41,7 @@ async fn install_docker() -> Result<String, String> {
 /// Pre-pull the OpenClaw Docker image in the background.
 #[tauri::command]
 async fn docker_prepull() -> Result<(), String> {
-    docker::pull_image("ghcr.io/openclaw/openclaw:2026.2.17").await
+    docker::pull_image("ghcr.io/openclaw/openclaw:2026.2.21").await
 }
 
 // ---------------------------------------------------------------------------
