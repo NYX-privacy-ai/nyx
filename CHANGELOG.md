@@ -3,6 +3,14 @@
 All notable changes to Nyx will be documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/); versions follow [Semantic Versioning](https://semver.org/).
 
+## [1.4.1] — 2026-02-23
+
+### Fixed
+
+- **Cron jobs failing silently** — OpenClaw's cron engine requires `agentId` and `id` fields on every job, but Nyx was using non-standard field names (`prompt` instead of `payload`, `schedule.cron` instead of `schedule.expr`, `delivery.channel` instead of `delivery.mode`). All cron jobs silently fell back to the default agent on a single shared session lane, causing serialization bottlenecks and permanently stuck jobs.
+- **Bundled `jobs.json` corrected** — added `id` and `agentId` fields to all 4 jobs; changed `delivery.mode` from `"announce"` (triggers gateway pairing hang) to `"none"`.
+- **`config.rs` `write_cron_jobs()` rewritten** — now generates correct OpenClaw v2 job structure: `payload` with `kind: "agentTurn"`, proper `schedule` format (`kind`/`expr`/`tz`), `sessionTarget: "isolated"`, `state` with `nextRunAtMs`, and `delivery.mode: "none"`. Jobs generated from settings updates now match the bundled defaults.
+
 ## [1.4.0] — 2026-02-20
 
 ### Security
