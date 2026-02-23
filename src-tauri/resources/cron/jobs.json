@@ -2,6 +2,8 @@
   "version": 2,
   "jobs": [
     {
+      "id": "nyx-heartbeat",
+      "agentId": "default",
       "name": "Nyx Heartbeat",
       "schedule": {
         "kind": "every",
@@ -17,11 +19,12 @@
       },
       "enabled": true,
       "delivery": {
-        "mode": "announce",
-        "channel": "whatsapp"
+        "mode": "none"
       }
     },
     {
+      "id": "daily-defi-report",
+      "agentId": "default",
       "name": "Daily DeFi Report",
       "schedule": {
         "kind": "cron",
@@ -38,11 +41,12 @@
       },
       "enabled": true,
       "delivery": {
-        "mode": "announce",
-        "channel": "whatsapp"
+        "mode": "none"
       }
     },
     {
+      "id": "hourly-email-triage",
+      "agentId": "default",
       "name": "Hourly Email Triage",
       "schedule": {
         "kind": "cron",
@@ -59,11 +63,12 @@
       },
       "enabled": true,
       "delivery": {
-        "mode": "announce",
-        "channel": "whatsapp"
+        "mode": "none"
       }
     },
     {
+      "id": "daily-email-digest",
+      "agentId": "default",
       "name": "Daily Email Digest",
       "schedule": {
         "kind": "cron",
@@ -80,8 +85,7 @@
       },
       "enabled": true,
       "delivery": {
-        "mode": "announce",
-        "channel": "whatsapp"
+        "mode": "none"
       }
     }
   ]

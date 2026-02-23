@@ -1282,40 +1282,109 @@ pub fn write_cron_jobs(config: &SetupConfig) -> Result<(), String> {
     let triage_cron = format!("0 {}-{} * * *", e.triage_start_hour, e.triage_end_hour);
     let digest_cron = format!("{} {} * * *", e.digest_minute, e.digest_hour);
 
-    let jobs = json!([
-        {
-            "id": "nyx-heartbeat",
-            "name": format!("{} Heartbeat", &config.agent_name),
-            "schedule": { "intervalMs": 14400000 },
-            "prompt": "/opt/near-intents-helper/run_near_intents.sh heartbeat --risk medium",
-            "delivery": { "channel": delivery_channel },
-            "enabled": defi_enabled
-        },
-        {
-            "id": "daily-defi-report",
-            "name": "Daily DeFi Report",
-            "schedule": { "cron": "0 9 * * *", "timezone": tz },
-            "prompt": "/opt/near-intents-helper/run_near_intents.sh daily-report",
-            "delivery": { "channel": delivery_channel },
-            "enabled": defi_enabled
-        },
-        {
-            "id": "hourly-email-triage",
-            "name": "Hourly Email Triage",
-            "schedule": { "cron": triage_cron, "timezone": tz },
-            "prompt": "Quick email triage across all gog accounts. Search for unread emails in the last hour. Only message me if something is 🔴 URGENT.",
-            "delivery": { "channel": delivery_channel },
-            "enabled": email_enabled
-        },
-        {
-            "id": "daily-email-digest",
-            "name": "Daily Email Digest",
-            "schedule": { "cron": digest_cron, "timezone": tz },
-            "prompt": "Generate daily email digest across all gog accounts. Last 24h summary grouped by priority. Always send this morning briefing.",
-            "delivery": { "channel": delivery_channel },
-            "enabled": email_enabled
-        }
-    ]);
+    let jobs = json!({
+        "version": 2,
+        "jobs": [
+            {
+                "id": "nyx-heartbeat",
+                "agentId": "default",
+                "name": format!("{} Heartbeat", &config.agent_name),
+                "schedule": { "kind": "every", "everyMs": 14400000 },
+                "sessionTarget": "isolated",
+                "payload": {
+                    "kind": "agentTurn",
+                    "message": format!(
+                        "Run the {} DeFi heartbeat check. Use the near-intents skill to execute: \
+                        /opt/near-intents-helper/run_near_intents.sh heartbeat --risk medium\n\n\
+                        If any actions were taken or errors occurred, send me a brief summary on {}. \
+                        If everything is stable and no actions were needed, stay silent (don't message me).",
+                        &config.agent_name, delivery_channel
+                    )
+                },
+                "state": { "nextRunAtMs": null },
+                "enabled": defi_enabled,
+                "delivery": { "mode": "none" }
+            },
+            {
+                "id": "daily-defi-report",
+                "agentId": "default",
+                "name": "Daily DeFi Report",
+                "schedule": { "kind": "cron", "expr": "0 9 * * *", "tz": tz },
+                "sessionTarget": "isolated",
+                "payload": {
+                    "kind": "agentTurn",
+                    "message": format!(
+                        "Generate and send the daily DeFi report. Use the near-intents skill to execute: \
+                        /opt/near-intents-helper/run_near_intents.sh daily-report\n\n\
+                        Format the results into a clear, concise message with:\n\
+                        - Portfolio value and daily P&L\n\
+                        - Any active positions (staking, lending)\n\
+                        - Top yield opportunities\n\
+                        - Trading status (active or halted)\n\
+                        - Any alerts or warnings\n\n\
+                        Keep it brief and readable on a phone screen. Send via {}.",
+                        delivery_channel
+                    )
+                },
+                "state": { "nextRunAtMs": null },
+                "enabled": defi_enabled,
+                "delivery": { "mode": "none" }
+            },
+            {
+                "id": "hourly-email-triage",
+                "agentId": "default",
+                "name": "Hourly Email Triage",
+                "schedule": { "kind": "cron", "expr": triage_cron, "tz": tz },
+                "sessionTarget": "isolated",
+                "payload": {
+                    "kind": "agentTurn",
+                    "message": "Quick email triage \u{2014} scan for high-priority emails across all configured accounts.\n\n\
+                        Use `gog accounts list` to discover all configured accounts, then for EACH account run:\n  \
+                        gog gmail search 'newer_than:1h is:unread' --max 20 --account <account>\n\n\
+                        Classify each unread email as:\n\
+                        - URGENT \u{2014} needs immediate attention (time-sensitive, from key contacts, financial, legal, security)\n\
+                        - IMPORTANT \u{2014} should be addressed today (client comms, scheduled items, action required)\n\
+                        - NORMAL \u{2014} can wait (newsletters, notifications, FYI)\n\n\
+                        ONLY message me if there are URGENT emails. Include:\n\
+                        - Sender, subject, one-line summary\n\
+                        - Why it's urgent\n\
+                        - Suggested action\n\n\
+                        If nothing urgent, stay silent. Do NOT send a message saying 'nothing urgent'."
+                },
+                "state": { "nextRunAtMs": null },
+                "enabled": email_enabled,
+                "delivery": { "mode": "none" }
+            },
+            {
+                "id": "daily-email-digest",
+                "agentId": "default",
+                "name": "Daily Email Digest",
+                "schedule": { "kind": "cron", "expr": digest_cron, "tz": tz },
+                "sessionTarget": "isolated",
+                "payload": {
+                    "kind": "agentTurn",
+                    "message": "Generate the daily email digest \u{2014} a comprehensive inbox summary across all accounts.\n\n\
+                        Use `gog accounts list` to discover all configured accounts, then for EACH account run:\n  \
+                        gog gmail search 'newer_than:24h' --max 50 --account <account>\n\n\
+                        Produce a concise digest grouped by priority:\n\n\
+                        URGENT (needs action NOW)\n\
+                        - [sender] subject \u{2014} one-line summary + suggested action\n\n\
+                        IMPORTANT (action today)\n\
+                        - [sender] subject \u{2014} one-line summary\n\n\
+                        STATS\n\
+                        - Total new emails (per account)\n\
+                        - Unread count\n\
+                        - Threads awaiting your reply\n\n\
+                        Skip newsletters, automated notifications, and low-priority items unless there's an unusual spike. \
+                        Keep it scannable on a phone screen.\n\n\
+                        Always send this digest even if nothing urgent \u{2014} it's the morning briefing."
+                },
+                "state": { "nextRunAtMs": null },
+                "enabled": email_enabled,
+                "delivery": { "mode": "none" }
+            }
+        ]
+    });
 
     let content = serde_json::to_string_pretty(&jobs)
         .map_err(|e| format!("Failed to serialize cron jobs: {}", e))?;
