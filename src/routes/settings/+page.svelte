@@ -183,47 +183,48 @@
       defaultLlmProvider = config.default_llm_provider || 'anthropic';
 
       // Guardrails
-      const g = config.guardrails;
+      const g = config.guardrails ?? {} as any;
       guardrails = {
-        maxTransactionUsd: g.max_transaction_usd,
-        dailyLossPercent: g.daily_loss_percent,
-        weeklyLossPercent: g.weekly_loss_percent,
-        dailyTxLimit: g.daily_tx_limit,
-        requireConfirmation: g.require_confirmation,
-        maxSlippagePercent: g.max_slippage_percent,
-        maxConcentrationPercent: g.max_concentration_percent,
-        minHealthFactor: g.min_health_factor,
+        maxTransactionUsd: g.max_transaction_usd ?? 500,
+        dailyLossPercent: g.daily_loss_percent ?? 5,
+        weeklyLossPercent: g.weekly_loss_percent ?? 15,
+        dailyTxLimit: g.daily_tx_limit ?? 10,
+        requireConfirmation: g.require_confirmation ?? true,
+        maxSlippagePercent: g.max_slippage_percent ?? 1,
+        maxConcentrationPercent: g.max_concentration_percent ?? 30,
+        minHealthFactor: g.min_health_factor ?? 1.5,
       };
       securityPreset = detectPreset(guardrails);
 
       // Messaging
-      const m = config.messaging;
+      const m = config.messaging ?? {} as any;
+      const defaultChannel = { enabled: false, autonomy: 'observe' };
       messaging = {
-        gmail: { enabled: m.gmail.enabled, autonomy: mapAutonomy(m.gmail.autonomy) },
-        whatsapp: { enabled: m.whatsapp.enabled, autonomy: mapAutonomy(m.whatsapp.autonomy) },
-        telegram: { enabled: m.telegram.enabled, autonomy: mapAutonomy(m.telegram.autonomy) },
-        slack: { enabled: m.slack.enabled, autonomy: mapAutonomy(m.slack.autonomy) },
+        gmail: { enabled: m.gmail?.enabled ?? false, autonomy: mapAutonomy(m.gmail?.autonomy) },
+        whatsapp: { enabled: m.whatsapp?.enabled ?? false, autonomy: mapAutonomy(m.whatsapp?.autonomy) },
+        telegram: { enabled: m.telegram?.enabled ?? false, autonomy: mapAutonomy(m.telegram?.autonomy) },
+        slack: { enabled: m.slack?.enabled ?? false, autonomy: mapAutonomy(m.slack?.autonomy) },
         signal: { enabled: m.signal?.enabled ?? false, autonomy: mapAutonomy(m.signal?.autonomy) },
       };
 
       // Email
-      const e = config.email_notifications;
-      emailEnabled = e.enabled;
-      emailTimezone = e.timezone;
-      emailDigestHour = e.digest_hour;
-      emailDigestMinute = e.digest_minute;
-      emailTriageStartHour = e.triage_start_hour;
-      emailTriageEndHour = e.triage_end_hour;
+      const e = config.email_notifications ?? {} as any;
+      emailEnabled = e.enabled ?? false;
+      emailTimezone = e.timezone ?? 'UTC';
+      emailDigestHour = e.digest_hour ?? 8;
+      emailDigestMinute = e.digest_minute ?? 0;
+      emailTriageStartHour = e.triage_start_hour ?? 9;
+      emailTriageEndHour = e.triage_end_hour ?? 17;
 
       // Capabilities
-      const c = config.capabilities;
+      const c = config.capabilities ?? {} as any;
       capabilities = {
-        defi_crypto: c.defi_crypto,
-        travel: c.travel,
-        google_workspace: c.google_workspace,
-        email_intelligence: c.email_intelligence,
-        communications: c.communications,
-        source_intelligence: c.source_intelligence,
+        defi_crypto: c.defi_crypto ?? false,
+        travel: c.travel ?? false,
+        google_workspace: c.google_workspace ?? false,
+        email_intelligence: c.email_intelligence ?? false,
+        communications: c.communications ?? false,
+        source_intelligence: c.source_intelligence ?? false,
         activity_intelligence: c.activity_intelligence ?? false,
         web_browsing: c.web_browsing ?? true,
       };

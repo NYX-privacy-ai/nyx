@@ -16,7 +16,7 @@
 
   const chains = ['NEAR', 'ETH', 'SOL', 'BTC', 'ZEC'];
 
-  const isValid = $derived(() => {
+  const isValid = $derived.by(() => {
     if (!address.trim()) return false;
     if (chain === 'ETH') return address.startsWith('0x') && address.length === 42;
     if (chain === 'SOL') return address.length >= 32 && address.length <= 44;
@@ -27,7 +27,7 @@
   });
 
   function handleSubmit() {
-    if (!isValid()) return;
+    if (!isValid) return;
     const finalLabel = label.trim() || `${chain} wallet`;
     onImport(chain, address.trim(), finalLabel);
     // Reset
@@ -115,8 +115,8 @@
         </button>
         <button
           onclick={handleSubmit}
-          disabled={!isValid()}
-          class="px-6 py-2 border text-sm rounded transition-colors duration-200 {isValid() ? 'border-gold text-gold hover:bg-gold/10' : 'border-border text-ivory-muted cursor-not-allowed'}"
+          disabled={!isValid}
+          class="px-6 py-2 border text-sm rounded transition-colors duration-200 {isValid ? 'border-gold text-gold hover:bg-gold/10' : 'border-border text-ivory-muted cursor-not-allowed'}"
         >
           Import
         </button>

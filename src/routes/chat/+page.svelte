@@ -88,14 +88,18 @@
   // Session actions
   async function createNewChat(folderId?: string) {
     if (!isTauri) return;
-    const { invoke } = await import('@tauri-apps/api/core');
-    const key: string = await invoke('create_chat_session', {
-      title: 'New chat',
-      folder: folderId ?? null
-    });
-    activeSessionKey = key;
-    messages = [];
-    await loadSessions();
+    try {
+      const { invoke } = await import('@tauri-apps/api/core');
+      const key: string = await invoke('create_chat_session', {
+        title: 'New chat',
+        folder: folderId ?? null
+      });
+      activeSessionKey = key;
+      messages = [];
+      await loadSessions();
+    } catch (e) {
+      console.error('Failed to create chat:', e);
+    }
   }
 
   async function switchSession(key: string) {
@@ -110,35 +114,52 @@
 
   async function confirmRename() {
     if (!renamingSession || !isTauri) return;
-    const { invoke } = await import('@tauri-apps/api/core');
-    await invoke('rename_chat_session', { sessionKey: renamingSession, title: renameValue });
-    renamingSession = null;
-    await loadSessions();
+    try {
+      const { invoke } = await import('@tauri-apps/api/core');
+      await invoke('rename_chat_session', { sessionKey: renamingSession, title: renameValue });
+      renamingSession = null;
+      await loadSessions();
+    } catch (e) {
+      console.error('Failed to rename session:', e);
+      renamingSession = null;
+    }
   }
 
   async function moveToFolder(sessionKey: string, folderId: string | null) {
     if (!isTauri) return;
-    const { invoke } = await import('@tauri-apps/api/core');
-    await invoke('move_session_to_folder', { sessionKey, folderId });
-    await loadSessions();
+    try {
+      const { invoke } = await import('@tauri-apps/api/core');
+      await invoke('move_session_to_folder', { sessionKey, folderId });
+      await loadSessions();
+    } catch (e) {
+      console.error('Failed to move session:', e);
+    }
   }
 
   // Folder actions
   async function createFolder() {
     if (!newFolderName.trim() || !isTauri) return;
-    const { invoke } = await import('@tauri-apps/api/core');
-    await invoke('create_chat_folder', { name: newFolderName.trim() });
-    newFolderName = '';
-    creatingFolder = false;
-    await loadFolders();
+    try {
+      const { invoke } = await import('@tauri-apps/api/core');
+      await invoke('create_chat_folder', { name: newFolderName.trim() });
+      newFolderName = '';
+      creatingFolder = false;
+      await loadFolders();
+    } catch (e) {
+      console.error('Failed to create folder:', e);
+    }
   }
 
   async function deleteFolder(folderId: string) {
     if (!isTauri) return;
-    const { invoke } = await import('@tauri-apps/api/core');
-    await invoke('delete_chat_folder', { folderId });
-    await loadFolders();
-    await loadSessions();
+    try {
+      const { invoke } = await import('@tauri-apps/api/core');
+      await invoke('delete_chat_folder', { folderId });
+      await loadFolders();
+      await loadSessions();
+    } catch (e) {
+      console.error('Failed to delete folder:', e);
+    }
   }
 
   // Chat

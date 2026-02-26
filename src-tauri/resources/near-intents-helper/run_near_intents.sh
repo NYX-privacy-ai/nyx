@@ -67,8 +67,28 @@ case "${COMMAND}" in
         shift
         run_with_leak_scan "${PYTHON}" "${KEYS_HELPER}" "${COMMAND}" "$@"
         ;;
+    # --- NEAR AI auth token ---
+    auth-token)
+        AUTH_HELPER="${SCRIPT_DIR}/nearai_auth.py"
+        if [[ ! -f "${AUTH_HELPER}" ]]; then
+            echo '{"status":"error","message":"nearai_auth.py not found."}' >&2
+            exit 1
+        fi
+        shift
+        run_with_leak_scan "${PYTHON}" "${AUTH_HELPER}" "$@"
+        ;;
+    # --- NEAR transfers ---
+    transfer)
+        TRANSFER_HELPER="${SCRIPT_DIR}/transfers.py"
+        if [[ ! -f "${TRANSFER_HELPER}" ]]; then
+            echo '{"status":"error","message":"transfers.py not found."}' >&2
+            exit 1
+        fi
+        shift
+        run_with_leak_scan "${PYTHON}" "${TRANSFER_HELPER}" "$@"
+        ;;
     *)
-        echo '{"status":"error","message":"Unknown command. Allowed: quote, publish, status, balance, positions, report, rebalance, burrow-loop, emergency-exit, heartbeat, daily-report, deploy-keys, list-keys"}' >&2
+        echo '{"status":"error","message":"Unknown command. Allowed: quote, publish, status, balance, positions, report, rebalance, burrow-loop, emergency-exit, heartbeat, daily-report, deploy-keys, list-keys, auth-token, transfer"}' >&2
         exit 1
         ;;
 esac

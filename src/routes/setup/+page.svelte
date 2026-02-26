@@ -1,10 +1,18 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
+  import { onDestroy } from 'svelte';
   import PrerequisiteCheck from '$lib/components/PrerequisiteCheck.svelte';
   import SecurityPresetCard from '$lib/components/SecurityPresetCard.svelte';
   import ChannelCard from '$lib/components/ChannelCard.svelte';
   import LocalModelCard from '$lib/components/LocalModelCard.svelte';
   import CapabilitySummary from '$lib/components/CapabilitySummary.svelte';
+
+  // Track intervals for cleanup on destroy
+  let activeIntervals: ReturnType<typeof setInterval>[] = [];
+  onDestroy(() => {
+    activeIntervals.forEach(clearInterval);
+    activeIntervals = [];
+  });
 
   let step = $state(0);
   let provisionStatus = $state('');
@@ -82,6 +90,7 @@
           }
         }
       }, 3000);
+      activeIntervals.push(pollInterval);
     } catch (e: any) {
       dockerInstallError = e?.toString() || 'Install failed';
       dockerStatus = 'not_installed';
@@ -117,6 +126,7 @@
           }
         }
       }, 3000);
+      activeIntervals.push(pollInterval);
     } catch (e: any) {
       ollamaInstallError = e?.toString() || 'Install failed';
       ollamaStatus = 'not_installed';

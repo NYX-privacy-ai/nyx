@@ -154,9 +154,11 @@
 
   onDestroy(() => {
     unlisten?.();
-    if (sessionId) {
+    // Capture sessionId before async operations to avoid stale state
+    const sid = sessionId;
+    if (sid) {
       import('@tauri-apps/api/core').then(({ invoke }) => {
-        invoke('pty_kill', { sessionId }).catch(() => {});
+        invoke('pty_kill', { sessionId: sid }).catch(() => {});
       });
     }
     terminal?.dispose();
