@@ -10,7 +10,7 @@ pub struct GogStatus {
 
 /// Check if the `gog` CLI binary is available.
 pub async fn check_gog_available() -> Result<GogStatus, String> {
-    // Try ~/openclaw/bin/gog first, then PATH
+    // Try ~/.nyx/bin/gog first, then PATH
     let gog_path = gog_binary_path();
 
     let output = Command::new(&gog_path)
@@ -75,7 +75,7 @@ pub async fn check_gog_authenticated() -> Result<bool, String> {
 /// Install the gog CLI binary from bundled app resources.
 pub async fn install_gog(app_handle: &tauri::AppHandle) -> Result<String, String> {
     let home = std::env::var("HOME").unwrap_or_default();
-    let bin_dir = format!("{}/openclaw/bin", home);
+    let bin_dir = format!("{}/.nyx/bin", home);
     let gog_path = format!("{}/gog", bin_dir);
 
     // Create bin directory if it doesn't exist
@@ -102,20 +102,6 @@ pub async fn install_gog(app_handle: &tauri::AppHandle) -> Result<String, String
             .map_err(|e| format!("Failed to set permissions: {}", e))?;
     }
 
-    // Also copy the Linux ARM64 binary (used inside the Docker container)
-    let bundled_gog_linux = resources_dir.join("bin/gog-linux-arm64");
-    let gog_linux_path = format!("{}/gog-linux-arm64", bin_dir);
-    if bundled_gog_linux.exists() {
-        std::fs::copy(&bundled_gog_linux, &gog_linux_path)
-            .map_err(|e| format!("Failed to copy gog-linux-arm64 binary: {}", e))?;
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            std::fs::set_permissions(&gog_linux_path, std::fs::Permissions::from_mode(0o755))
-                .map_err(|e| format!("Failed to set linux gog permissions: {}", e))?;
-        }
-    }
-
     // Verify the macOS binary runs on the host
     let verify = Command::new(&gog_path)
         .args(["--version"])
@@ -132,7 +118,7 @@ pub async fn install_gog(app_handle: &tauri::AppHandle) -> Result<String, String
 
 fn gog_binary_path() -> String {
     let home = std::env::var("HOME").unwrap_or_default();
-    let local_path = format!("{}/openclaw/bin/gog", home);
+    let local_path = format!("{}/.nyx/bin/gog", home);
 
     // Prefer the bundled gog binary if it exists
     if std::path::Path::new(&local_path).exists() {

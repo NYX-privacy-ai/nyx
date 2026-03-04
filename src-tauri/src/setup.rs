@@ -1,14 +1,14 @@
 use crate::config;
-use crate::docker;
+use crate::ironclaw;
 use crate::wallet;
 use std::path::PathBuf;
 use tauri::Manager;
 
-/// Check if Nyx has been set up (openclaw.json exists).
+/// Check if Nyx has been set up (config.toml + .env exist).
 pub async fn is_setup_complete() -> Result<bool, String> {
-    let home = config::home_dir();
-    let config_path = home.join(".openclaw/openclaw.json");
-    let env_path = home.join("openclaw/docker.env");
+    let nyx_dir = ironclaw::config_dir();
+    let config_path = nyx_dir.join("config.toml");
+    let env_path = nyx_dir.join(".env");
     Ok(config_path.exists() && env_path.exists())
 }
 
@@ -29,7 +29,6 @@ pub fn resolve_resources_dir(app_handle: &tauri::AppHandle) -> Result<PathBuf, S
     }
 
     // In development, Tauri may not resolve properly — check src-tauri/resources/
-    // relative to the current executable
     let dev_path = std::env::current_dir()
         .unwrap_or_default()
         .join("src-tauri/resources");
@@ -38,7 +37,7 @@ pub fn resolve_resources_dir(app_handle: &tauri::AppHandle) -> Result<PathBuf, S
     }
 
     // Also check if resource_path itself contains the expected files
-    if resource_path.join("docker-compose.yml").exists() {
+    if resource_path.join("workspace").exists() {
         return Ok(resource_path);
     }
 
@@ -59,11 +58,11 @@ pub async fn run_setup(
 
     // Step 2: Generate NEAR wallet
     let (wallet_info, wallet_config) = wallet::generate_near_wallet().await?;
-    let home = config::home_dir();
-    wallet::save_wallet(&wallet_info, &home.join(".openclaw/secrets"))?;
+    let nyx_dir = ironclaw::config_dir();
+    wallet::save_wallet(&wallet_info, &nyx_dir.join("secrets"))?;
     wallet::save_wallet_key(&wallet_config.id, &wallet_info)?;
 
-    // Step 3: Write config files — credentials injected via env vars (IronClaw pattern)
+    // Step 3: Write config files
     let guardrails = config::GuardrailsConfig::default();
 
     let setup_config = config::SetupConfig {
@@ -86,13 +85,13 @@ pub async fn run_setup(
         capabilities: config::CapabilitiesConfig::default(),
     };
 
-    config::write_docker_env(&setup_config)?;
-    config::write_openclaw_config(&setup_config)?;
+    config::write_nyx_env(&setup_config)?;
+    config::write_ironclaw_config(&setup_config)?;
     config::write_guardrails(&guardrails)?;
     config::write_cron_jobs(&setup_config)?;
 
     // Step 4: Write empty function call keys
-    let keys_path = home.join(".openclaw/secrets/function_call_keys.json");
+    let keys_path = nyx_dir.join("secrets/function_call_keys.json");
     std::fs::write(&keys_path, "{}").map_err(|e| format!("Failed to write keys: {}", e))?;
     #[cfg(unix)]
     {
@@ -105,14 +104,14 @@ pub async fn run_setup(
     let resources_dir = resolve_resources_dir(&app_handle)?;
     config::copy_resources(&resources_dir)?;
 
-    // Step 6: Pull Docker image
-    docker::pull_image("ghcr.io/openclaw/openclaw:2026.2.21").await?;
+    // Step 6: Write daemon wrapper script
+    write_daemon_script()?;
 
-    // Step 7: Start container
-    docker::start_container().await?;
-
-    // Step 8: Write LaunchAgent
+    // Step 7: Write LaunchAgent plist
     write_launch_agent()?;
+
+    // Step 8: Start IronClaw daemon
+    ironclaw::start_daemon().await?;
 
     Ok(wallet_info.account_id)
 }
@@ -139,16 +138,12 @@ pub async fn run_setup_v2(
     capabilities: config::CapabilitiesConfig,
 ) -> Result<String, String> {
     let gateway_token = config::generate_token();
-    let home = config::home_dir();
+    let nyx_dir = ironclaw::config_dir();
 
     // Step 1: Create directory structure
     config::create_directories()?;
 
-    // Step 2: Save private keys for any NEAR wallets that were generated
-    // (The UI calls generate_near_wallet_full which gives us WalletInfo + WalletConfig.
-    //  Private keys are saved per-wallet at generation time, so nothing extra here.)
-
-    // Step 3: Write config files
+    // Step 2: Write config files
     let active_id = active_wallet_id.or_else(|| {
         wallets.first().map(|w| w.id.clone())
     });
@@ -173,13 +168,13 @@ pub async fn run_setup_v2(
         capabilities,
     };
 
-    config::write_docker_env(&setup_config)?;
-    config::write_openclaw_config(&setup_config)?;
+    config::write_nyx_env(&setup_config)?;
+    config::write_ironclaw_config(&setup_config)?;
     config::write_guardrails(&guardrails)?;
     config::write_cron_jobs(&setup_config)?;
 
-    // Step 4: Write empty function call keys
-    let keys_path = home.join(".openclaw/secrets/function_call_keys.json");
+    // Step 3: Write empty function call keys
+    let keys_path = nyx_dir.join("secrets/function_call_keys.json");
     std::fs::write(&keys_path, "{}").map_err(|e| format!("Failed to write keys: {}", e))?;
     #[cfg(unix)]
     {
@@ -188,12 +183,12 @@ pub async fn run_setup_v2(
             .map_err(|e| format!("Failed to set keys permissions: {}", e))?;
     }
 
-    // Step 5: Copy bundled resources
+    // Step 4: Copy bundled resources
     let resources_dir = resolve_resources_dir(&app_handle)?;
     config::copy_resources(&resources_dir)?;
 
-    // Step 5b: Personalize SOUL.md with the configured agent name
-    let soul_path = home.join("openclaw/workspace/SOUL.md");
+    // Step 4b: Personalize SOUL.md with the configured agent name
+    let soul_path = nyx_dir.join("workspace/SOUL.md");
     if soul_path.exists() {
         let soul_content = std::fs::read_to_string(&soul_path)
             .map_err(|e| format!("Failed to read SOUL.md: {}", e))?;
@@ -202,14 +197,14 @@ pub async fn run_setup_v2(
             .map_err(|e| format!("Failed to write SOUL.md: {}", e))?;
     }
 
-    // Step 6: Pull Docker image
-    docker::pull_image("ghcr.io/openclaw/openclaw:2026.2.21").await?;
+    // Step 5: Write daemon wrapper script
+    write_daemon_script()?;
 
-    // Step 7: Start container
-    docker::start_container().await?;
-
-    // Step 8: Write LaunchAgent
+    // Step 6: Write LaunchAgent plist
     write_launch_agent()?;
+
+    // Step 7: Start IronClaw daemon
+    ironclaw::start_daemon().await?;
 
     // Return the active wallet address as confirmation
     let active_address = setup_config
@@ -222,8 +217,59 @@ pub async fn run_setup_v2(
     Ok(active_address)
 }
 
+/// Write the daemon wrapper script that ensures proper PATH and keeps stdin open.
+/// (Atlas learning #2: launchd provides minimal PATH)
+fn write_daemon_script() -> Result<(), String> {
+    let home = config::home_dir();
+    let nyx_dir = ironclaw::config_dir();
+    let script_path = nyx_dir.join("run-daemon.sh");
+
+    let content = format!(
+        r#"#!/usr/bin/env bash
+set -euo pipefail
+export PATH="/usr/local/bin:/opt/homebrew/bin:{home}/.cargo/bin:{home}/.nyx/bin:$PATH"
+export HOME="{home}"
+
+# Source IronClaw environment
+set -a
+source "{nyx_dir}/.env"
+set +a
+
+# Export required vars for IronClaw
+export LLM_BACKEND
+export ANTHROPIC_API_KEY
+export DATABASE_BACKEND
+export LIBSQL_PATH
+export GATEWAY_AUTH_TOKEN
+
+# Run IronClaw daemon with config pointing to Nyx directory
+# Uses PATH resolution (binary may be in ~/.cargo/bin, /opt/homebrew/bin, etc.)
+# Process substitution keeps stdin open (Atlas learning: REPL channel needs stdin)
+exec ironclaw run --config "{nyx_dir}/config.toml" < <(
+    while true; do sleep 86400; done
+)
+"#,
+        home = home.display(),
+        nyx_dir = nyx_dir.display(),
+    );
+
+    std::fs::write(&script_path, content)
+        .map_err(|e| format!("Failed to write run-daemon.sh: {}", e))?;
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&script_path, std::fs::Permissions::from_mode(0o755))
+            .map_err(|e| format!("Failed to set run-daemon.sh permissions: {}", e))?;
+    }
+
+    Ok(())
+}
+
+/// Write the macOS LaunchAgent plist for the Nyx IronClaw daemon.
 fn write_launch_agent() -> Result<(), String> {
     let home = config::home_dir();
+    let nyx_dir = ironclaw::config_dir();
     let plist_dir = home.join("Library/LaunchAgents");
     std::fs::create_dir_all(&plist_dir)
         .map_err(|e| format!("Failed to create LaunchAgents dir: {}", e))?;
@@ -234,34 +280,37 @@ fn write_launch_agent() -> Result<(), String> {
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>com.nyx.agent</string>
+    <string>com.nyx.daemon</string>
     <key>ProgramArguments</key>
     <array>
         <string>/bin/bash</string>
-        <string>{}/openclaw/start-nyx.sh</string>
+        <string>{}/run-daemon.sh</string>
     </array>
     <key>RunAtLoad</key>
     <true/>
     <key>KeepAlive</key>
-    <false/>
+    <true/>
     <key>EnvironmentVariables</key>
     <dict>
         <key>HOME</key>
         <string>{}</string>
         <key>PATH</key>
-        <string>/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin</string>
+        <string>/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin:{}/.cargo/bin</string>
     </dict>
     <key>StandardOutPath</key>
-    <string>/tmp/nyx-launchagent-stdout.log</string>
+    <string>{}/logs/daemon-stdout.log</string>
     <key>StandardErrorPath</key>
-    <string>/tmp/nyx-launchagent-stderr.log</string>
+    <string>{}/logs/daemon-stderr.log</string>
 </dict>
 </plist>"#,
+        nyx_dir.display(),
         home.display(),
-        home.display()
+        home.display(),
+        nyx_dir.display(),
+        nyx_dir.display(),
     );
 
-    let path = plist_dir.join("com.nyx.agent.plist");
+    let path = plist_dir.join("com.nyx.daemon.plist");
     std::fs::write(&path, plist)
         .map_err(|e| format!("Failed to write LaunchAgent: {}", e))?;
 

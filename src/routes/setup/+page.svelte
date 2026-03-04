@@ -24,13 +24,12 @@
   let disclaimerAccepted = $state(false);
 
   // ── Step 1: Prerequisites ──
-  let dockerStatus = $state<'checking' | 'installed' | 'not_installed' | 'running' | 'not_running' | 'installing'>('checking');
-  let dockerVersion = $state<string | null>(null);
-  let dockerDownloadUrl = $state<string | null>(null);
+  let ironclawStatus = $state<'checking' | 'installed' | 'not_installed' | 'running' | 'not_running' | 'installing'>('checking');
+  let ironclawVersion = $state<string | null>(null);
   let gogStatus = $state<'checking' | 'installed' | 'not_installed' | 'running' | 'installing'>('checking');
   let gogAuthenticated = $state(false);
-  let dockerInstallError = $state('');
-  let dockerStartupHint = $state('');
+  let ironclawInstallError = $state('');
+  let ironclawStartupHint = $state('');
 
   // Ollama (local models)
   let ollamaStatus = $state<'checking' | 'installed' | 'not_installed' | 'running' | 'installing'>('checking');
@@ -52,48 +51,27 @@
 
   let hasLocalModel = $derived(ollamaModels.length > 0);
 
-  async function installDocker() {
-    dockerStatus = 'installing';
-    dockerInstallError = '';
-    dockerStartupHint = '';
+  async function installIronClaw() {
+    ironclawStatus = 'installing';
+    ironclawInstallError = '';
+    ironclawStartupHint = '';
     try {
       const { invoke } = await import('@tauri-apps/api/core');
-      const version: string = await invoke('install_docker');
-      dockerVersion = version;
-      dockerStatus = 'not_running';
-      dockerStartupHint = 'Waiting for Docker daemon to start...';
-      let attempts = 0;
-      const pollInterval = setInterval(async () => {
-        attempts++;
-        if (attempts <= 5) {
-          dockerStartupHint = 'Waiting for Docker daemon to start...';
-        } else if (attempts <= 12) {
-          dockerStartupHint = 'Docker is initialising — this can take up to a minute on first launch...';
-        } else {
-          dockerStartupHint = 'Still waiting — Docker first launch can be slow. You can also try "Re-check".';
-        }
-        try {
-          const docker: any = await invoke('check_docker_detailed');
-          if (docker.running) {
-            dockerStatus = 'running';
-            dockerVersion = docker.version || dockerVersion;
-            dockerStartupHint = '';
-            clearInterval(pollInterval);
-          } else if (attempts >= 30) {
-            dockerStartupHint = 'Docker is installed but the daemon hasn\'t started yet. Launch Docker Desktop from your Applications folder, then click Re-check.';
-            clearInterval(pollInterval);
-          }
-        } catch {
-          if (attempts >= 30) {
-            dockerStartupHint = 'Docker is installed but the daemon hasn\'t started yet. Launch Docker Desktop from your Applications folder, then click Re-check.';
-            clearInterval(pollInterval);
-          }
-        }
-      }, 3000);
-      activeIntervals.push(pollInterval);
+      const result: string = await invoke('install_ironclaw');
+      ironclawVersion = result;
+      ironclawStatus = 'installed';
+      ironclawStartupHint = 'IronClaw installed. Starting daemon...';
+      // Try to start the daemon
+      try {
+        await invoke('ironclaw_start');
+        ironclawStatus = 'running';
+        ironclawStartupHint = '';
+      } catch {
+        ironclawStartupHint = 'IronClaw installed but daemon failed to start. Click Re-check after verifying installation.';
+      }
     } catch (e: any) {
-      dockerInstallError = e?.toString() || 'Install failed';
-      dockerStatus = 'not_installed';
+      ironclawInstallError = e?.toString() || 'Install failed';
+      ironclawStatus = 'not_installed';
     }
   }
 
@@ -134,20 +112,19 @@
   }
 
   async function checkPrerequisites() {
-    dockerStatus = 'checking';
+    ironclawStatus = 'checking';
     gogStatus = 'checking';
     try {
       const { invoke } = await import('@tauri-apps/api/core');
-      const docker: any = await invoke('check_docker_detailed');
-      if (docker.running) {
-        dockerStatus = 'running';
-      } else if (docker.installed) {
-        dockerStatus = 'not_running';
+      const ic: any = await invoke('check_ironclaw_detailed');
+      if (ic.running) {
+        ironclawStatus = 'running';
+      } else if (ic.installed) {
+        ironclawStatus = 'installed';
       } else {
-        dockerStatus = 'not_installed';
+        ironclawStatus = 'not_installed';
       }
-      dockerVersion = docker.version;
-      dockerDownloadUrl = docker.download_url;
+      ironclawVersion = ic.version;
 
       const gog: any = await invoke('check_gog_available');
       if (gog.installed) {
@@ -173,10 +150,20 @@
       } catch {
         ollamaStatus = 'not_installed';
       }
+
+      // If IronClaw is installed but not running, try to start it
+      if (ironclawStatus === 'installed') {
+        try {
+          await invoke('ironclaw_start');
+          ironclawStatus = 'running';
+        } catch {
+          ironclawStartupHint = 'IronClaw is installed but the daemon could not be started. Check logs.';
+        }
+      }
     } catch {
       // Dev mode fallback
-      dockerStatus = 'running';
-      dockerVersion = 'Docker Desktop 4.x (dev)';
+      ironclawStatus = 'running';
+      ironclawVersion = 'IronClaw v0.12 (dev)';
       gogStatus = 'not_installed';
       ollamaStatus = 'not_installed';
     }
@@ -234,33 +221,14 @@
     }
   }
 
-  // Auto-advance when Docker is running on Step 1
+  // Auto-advance when IronClaw is running on Step 1
   $effect(() => {
-    if (step === 1 && dockerStatus === 'running') {
+    if (step === 1 && ironclawStatus === 'running') {
       setTimeout(() => {
-        if (step === 1 && dockerStatus === 'running') {
+        if (step === 1 && ironclawStatus === 'running') {
           step = 2;
         }
       }, 600);
-    }
-  });
-
-  // ── Background Docker image pre-pull ──
-  let imagePullStarted = $state(false);
-  let imagePullDone = $state(false);
-
-  $effect(() => {
-    if (dockerStatus === 'running' && !imagePullStarted && step >= 1) {
-      imagePullStarted = true;
-      (async () => {
-        try {
-          const { invoke } = await import('@tauri-apps/api/core');
-          await invoke('docker_prepull');
-          imagePullDone = true;
-        } catch {
-          // Silently fail — provision will retry
-        }
-      })();
     }
   });
 
@@ -558,19 +526,7 @@
         signal: { enabled: messaging.signal.enabled, autonomy: autonomyToRust(messaging.signal.autonomy) },
       };
 
-      // Configure ClawdTalk BEFORE writing main config so safeBins/skills are included
-      if (clawdtalkEnabled && clawdtalkKey) {
-        provisionStatus = 'Configuring voice calling...';
-        try {
-          await invoke('clawdtalk_configure', { apiKey: clawdtalkKey });
-        } catch {
-          console.warn('ClawdTalk configuration failed — can be set up later in Settings');
-        }
-      }
-
-      provisionStatus = imagePullDone
-        ? 'Writing configuration...'
-        : 'Downloading container image & writing configuration — this may take a few minutes...';
+      provisionStatus = 'Writing configuration & starting daemon...';
 
       await invoke('run_setup_v2', {
         agentName: agentName.trim() || 'Nyx',
@@ -619,6 +575,16 @@
         },
       });
 
+      // Configure ClawdTalk AFTER setup (directories must exist first)
+      if (clawdtalkEnabled && clawdtalkKey) {
+        provisionStatus = 'Configuring voice calling...';
+        try {
+          await invoke('clawdtalk_configure', { apiKey: clawdtalkKey });
+        } catch {
+          console.warn('ClawdTalk configuration failed — can be set up later in Settings');
+        }
+      }
+
       provisionStatus = 'Setup complete!';
       setTimeout(() => {
         step = 4;
@@ -638,7 +604,7 @@
   function canAdvance(s: number): boolean {
     switch (s) {
       case 0: return disclaimerAccepted;
-      case 1: return dockerStatus === 'running';
+      case 1: return ironclawStatus === 'running';
       case 2: {
         if (defaultLlmProvider === 'ollama') {
           return hasLocalModel; // Must download at least one model
@@ -689,7 +655,7 @@
         <h1 class="font-display text-4xl font-light tracking-wider text-ivory mb-4">Nyx</h1>
         <p class="text-ivory-muted text-sm leading-relaxed mb-2">Your private AI chief of staff</p>
         <p class="text-ivory-muted/50 text-xs leading-relaxed max-w-sm mx-auto">
-          Built on <span class="text-gold/60">OpenClaw</span>. Communications, calendar, documents, and crypto — all from one secure interface, running locally on your machine.
+          Built on <span class="text-gold/60">IronClaw</span>. Communications, calendar, documents, and crypto — all from one secure interface, running locally on your machine.
         </p>
       </div>
 
@@ -740,12 +706,11 @@
 
       <div class="space-y-4 mb-8">
         <PrerequisiteCheck
-          label="Docker Desktop"
-          status={dockerStatus}
-          version={dockerVersion}
-          downloadUrl={dockerDownloadUrl}
-          onInstall={installDocker}
-          installError={dockerInstallError}
+          label="IronClaw"
+          status={ironclawStatus}
+          version={ironclawVersion}
+          onInstall={installIronClaw}
+          installError={ironclawInstallError}
           optional={false}
         />
         <PrerequisiteCheck
@@ -757,25 +722,25 @@
           optional={true}
           installError={ollamaInstallError}
         />
-        {#if dockerStartupHint}
+        {#if ironclawStartupHint}
           <div class="flex items-start gap-2 px-4 -mt-2">
-            {#if dockerStatus === 'not_running'}
+            {#if ironclawStatus === 'installed'}
               <div class="w-3 h-3 mt-0.5 flex-shrink-0">
                 <div class="w-3 h-3 border-2 border-gold border-t-transparent rounded-full animate-spin"></div>
               </div>
             {/if}
-            <p class="text-ivory-muted/60 text-xs leading-relaxed">{dockerStartupHint}</p>
+            <p class="text-ivory-muted/60 text-xs leading-relaxed">{ironclawStartupHint}</p>
           </div>
         {/if}
       </div>
 
-      {#if dockerStatus === 'running'}
+      {#if ironclawStatus === 'running'}
         <div class="text-center">
           <div class="flex items-center justify-center gap-2 text-positive text-sm">
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
               <path d="M4.5 12.75l6 6 9-13.5" />
             </svg>
-            <span>Docker is running — continuing...</span>
+            <span>IronClaw is running — continuing...</span>
           </div>
         </div>
       {:else}
@@ -1530,7 +1495,7 @@
               <h3 class="text-ivory text-sm">Connect Signal</h3>
             </div>
             <ol class="text-ivory-muted text-xs space-y-1.5 ml-11 list-decimal">
-              <li>Signal CLI is running in Docker alongside {agentName}</li>
+              <li>Signal CLI is running alongside {agentName}</li>
               <li>Register your number: open <strong class="text-ivory">Chat</strong> and ask {agentName} to <span class="text-gold italic">"Register Signal with {signalPhone || 'my number'}"</span></li>
               <li>You will receive a verification code via SMS — share it with {agentName} to complete registration</li>
               <li>Once verified, send encrypted messages directly to your Signal number</li>

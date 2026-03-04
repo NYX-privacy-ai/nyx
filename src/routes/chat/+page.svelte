@@ -105,6 +105,21 @@
   async function switchSession(key: string) {
     activeSessionKey = key;
     messages = [];
+    // Load session history from transcript
+    if (isTauri) {
+      try {
+        const { invoke } = await import('@tauri-apps/api/core');
+        const history: Message[] = await invoke('get_session_history', {
+          sessionKey: key,
+          limit: 50
+        });
+        if (history && history.length > 0) {
+          messages = history;
+        }
+      } catch (e) {
+        console.warn('Could not load session history:', e);
+      }
+    }
   }
 
   async function startRename(key: string, currentTitle: string) {
@@ -247,6 +262,20 @@
           if (models.length > 0) ollamaModel = models[0].name;
         }
       } catch { ollamaAvailable = false; }
+
+      // Load history for the default session
+      try {
+        const { invoke } = await import('@tauri-apps/api/core');
+        const history: Message[] = await invoke('get_session_history', {
+          sessionKey: activeSessionKey,
+          limit: 50
+        });
+        if (history && history.length > 0) {
+          messages = history;
+        }
+      } catch (e) {
+        console.warn('Could not load initial session history:', e);
+      }
     }
   });
 </script>

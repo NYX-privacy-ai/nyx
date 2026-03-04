@@ -13,8 +13,8 @@ use rmcp::{
 };
 
 use crate::config;
-use crate::docker;
 use crate::gateway;
+use crate::ironclaw;
 use crate::oneclick;
 use crate::portfolio_data;
 
@@ -54,6 +54,38 @@ pub struct ZecQuoteParams {
     pub amount: String,
     /// Recipient address (required for unshield direction)
     pub recipient: Option<String>,
+}
+
+#[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
+pub struct ConfidentialQuoteParams {
+    /// Origin asset identifier (e.g. "nep141:wrap.near", "nep141:eth.omft.near")
+    pub origin_asset: String,
+    /// Destination asset identifier (e.g. "nep141:usdc.eth.omft.near")
+    pub destination_asset: String,
+    /// Amount to swap (in smallest unit of the origin asset)
+    pub amount: String,
+}
+
+#[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
+pub struct ScheduleParams {
+    /// Action to perform: "list", "create", "update", "delete", "enable", "disable"
+    pub action: String,
+    /// Job ID (required for update, delete, enable, disable)
+    pub id: Option<String>,
+    /// Job name (required for create)
+    pub name: Option<String>,
+    /// Schedule string. For interval: "every:3600000" (ms). For cron: "cron:0 9 * * *" or "cron:0 9 * * *:Europe/London"
+    pub schedule: Option<String>,
+    /// The message/instruction the agent executes when the job fires (required for create)
+    pub message: Option<String>,
+}
+
+#[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
+pub struct SessionHandoffParams {
+    /// Session key to load history from (e.g. "agent:default:main")
+    pub session_key: String,
+    /// Maximum number of recent messages to retrieve (default: 20)
+    pub limit: Option<usize>,
 }
 
 // ---------------------------------------------------------------------------
@@ -116,10 +148,10 @@ impl NyxMcpServer {
         }
     }
 
-    /// Check the Nyx Docker container status.
-    #[tool(description = "Check the Nyx Docker container status including whether it's running, the image version, and system health.")]
-    async fn nyx_docker_status(&self) -> String {
-        match docker::check_docker_detailed().await {
+    /// Check the Nyx IronClaw daemon status.
+    #[tool(description = "Check the Nyx IronClaw daemon status including whether it's running, the version, and gateway port.")]
+    async fn nyx_ironclaw_status(&self) -> String {
+        match ironclaw::check_ironclaw_detailed().await {
             Ok(status) => serde_json::to_string_pretty(&status)
                 .unwrap_or_else(|_| "Failed to serialize status".to_string()),
             Err(e) => format!("Error: {}", e),
@@ -188,6 +220,186 @@ impl NyxMcpServer {
             Err(e) => format!("Error: {}", e),
         }
     }
+
+    /// Get a confidential cross-chain swap quote via NEAR Confidential Intents.
+    #[tool(description = "Get a confidential cross-chain swap quote via NEAR Confidential Intents. Executes in a TEE-secured private shard — prevents MEV, frontrunning, and strategy leakage. Same speed and cost as public swaps, but transaction details remain confidential during execution.")]
+    async fn nyx_confidential_quote(
+        &self,
+        Parameters(params): Parameters<ConfidentialQuoteParams>,
+    ) -> String {
+        let near_account = config::get_near_account()
+            .unwrap_or_else(|| "nyx.near".to_string());
+
+        let result = oneclick::get_confidential_quote(
+            &params.origin_asset,
+            &params.destination_asset,
+            &params.amount,
+            &near_account,
+            &near_account,
+        )
+        .await;
+
+        match result {
+            Ok(quote) => serde_json::to_string_pretty(&quote)
+                .unwrap_or_else(|_| "Failed to serialize quote".to_string()),
+            Err(e) => format!("Error: {}", e),
+        }
+    }
+
+    /// Manage scheduled tasks (cron jobs). Create, list, update, delete, enable or disable recurring agent tasks.
+    #[tool(description = "Manage scheduled tasks (cron jobs). Actions: 'list' all tasks, 'create' a new recurring task, 'update' an existing task, 'delete' a task, 'enable'/'disable' a task. Schedule format: 'every:3600000' (interval in ms) or 'cron:0 9 * * *:Europe/London' (cron expression with optional timezone).")]
+    async fn nyx_schedule(&self, Parameters(params): Parameters<ScheduleParams>) -> String {
+        match params.action.as_str() {
+            "list" => match config::read_cron_jobs() {
+                Ok(file) => serde_json::to_string_pretty(&file.jobs)
+                    .unwrap_or_else(|_| "Failed to serialize jobs".to_string()),
+                Err(e) => format!("Error: {}", e),
+            },
+            "create" => {
+                let name = match params.name {
+                    Some(n) => n,
+                    None => return "Error: 'name' is required for create".to_string(),
+                };
+                let schedule_str = match params.schedule {
+                    Some(s) => s,
+                    None => return "Error: 'schedule' is required for create".to_string(),
+                };
+                let message = match params.message {
+                    Some(m) => m,
+                    None => return "Error: 'message' is required for create".to_string(),
+                };
+                let schedule = match parse_schedule_string(&schedule_str) {
+                    Ok(s) => s,
+                    Err(e) => return format!("Error: {}", e),
+                };
+                match config::create_cron_job(name, schedule, message, true) {
+                    Ok(job) => serde_json::to_string_pretty(&job)
+                        .unwrap_or_else(|_| "Created".to_string()),
+                    Err(e) => format!("Error: {}", e),
+                }
+            }
+            "update" => {
+                let id = match params.id {
+                    Some(i) => i,
+                    None => return "Error: 'id' is required for update".to_string(),
+                };
+                let schedule = match params.schedule {
+                    Some(s) => match parse_schedule_string(&s) {
+                        Ok(sched) => Some(sched),
+                        Err(e) => return format!("Error: {}", e),
+                    },
+                    None => None,
+                };
+                match config::update_cron_job(
+                    &id,
+                    config::CronJobUpdate {
+                        name: params.name,
+                        schedule,
+                        message: params.message,
+                        enabled: None,
+                    },
+                ) {
+                    Ok(job) => serde_json::to_string_pretty(&job)
+                        .unwrap_or_else(|_| "Updated".to_string()),
+                    Err(e) => format!("Error: {}", e),
+                }
+            }
+            "delete" => {
+                let id = match params.id {
+                    Some(i) => i,
+                    None => return "Error: 'id' is required for delete".to_string(),
+                };
+                match config::delete_cron_job(&id) {
+                    Ok(()) => format!("Deleted job '{}'", id),
+                    Err(e) => format!("Error: {}", e),
+                }
+            }
+            "enable" | "disable" => {
+                let id = match params.id {
+                    Some(i) => i,
+                    None => return format!("Error: 'id' is required for {}", params.action),
+                };
+                let enabled = params.action == "enable";
+                match config::update_cron_job(
+                    &id,
+                    config::CronJobUpdate {
+                        name: None,
+                        schedule: None,
+                        message: None,
+                        enabled: Some(enabled),
+                    },
+                ) {
+                    Ok(job) => {
+                        let state = if enabled { "enabled" } else { "disabled" };
+                        format!("Job '{}' {}: {}", job.id, state, job.name)
+                    }
+                    Err(e) => format!("Error: {}", e),
+                }
+            }
+            other => format!(
+                "Unknown action '{}'. Use: list, create, update, delete, enable, disable.",
+                other
+            ),
+        }
+    }
+
+    /// Load recent message history from a session transcript. Useful for context handoff between sessions or platforms.
+    #[tool(description = "Load recent message history from a session transcript. Returns the last N messages from a given session. Useful for cross-platform session continuation or context handoff between different conversations.")]
+    async fn nyx_session_handoff(
+        &self,
+        Parameters(params): Parameters<SessionHandoffParams>,
+    ) -> String {
+        let limit = params.limit.unwrap_or(20);
+        match gateway::load_session_history(&params.session_key, limit) {
+            Ok(messages) => serde_json::to_string_pretty(&messages)
+                .unwrap_or_else(|_| "Failed to serialize history".to_string()),
+            Err(e) => format!("Error: {}", e),
+        }
+    }
+}
+
+/// Parse a schedule string like "every:3600000" or "cron:0 9 * * *:Europe/London"
+fn parse_schedule_string(s: &str) -> Result<config::CronSchedule, String> {
+    if let Some(rest) = s.strip_prefix("every:") {
+        let ms: u64 = rest
+            .parse()
+            .map_err(|_| format!("Invalid interval '{}' — must be milliseconds", rest))?;
+        if ms < 60000 {
+            return Err("Minimum interval is 60000ms (1 minute)".to_string());
+        }
+        Ok(config::CronSchedule::Every { every_ms: ms, anchor_ms: None })
+    } else if let Some(rest) = s.strip_prefix("cron:") {
+        // Format: "cron:0 9 * * *" or "cron:0 9 * * *:Europe/London"
+        // Cron expression has 5 fields; timezone is after the 5th field separator
+        let parts: Vec<&str> = rest.splitn(6, ' ').collect();
+        if parts.len() < 5 {
+            return Err(format!(
+                "Invalid cron expression '{}' — need 5 fields (min hour dom mon dow)",
+                rest
+            ));
+        }
+        let (expr, tz) = if parts.len() == 6 {
+            // Last part may be "dow:TZ" if timezone was appended with ':'
+            let last = parts[5];
+            if last.contains(':') {
+                let split: Vec<&str> = last.splitn(2, ':').collect();
+                (
+                    format!("{} {}", parts[..5].join(" "), split[0]),
+                    Some(split[1].to_string()),
+                )
+            } else {
+                (parts.join(" "), None)
+            }
+        } else {
+            (rest.to_string(), None)
+        };
+        Ok(config::CronSchedule::Cron { expr, tz })
+    } else {
+        Err(format!(
+            "Invalid schedule '{}'. Use 'every:<ms>' or 'cron:<expr>'",
+            s
+        ))
+    }
 }
 
 #[tool_handler]
@@ -195,9 +407,11 @@ impl ServerHandler for NyxMcpServer {
     fn get_info(&self) -> ServerInfo {
         ServerInfo {
             instructions: Some(
-                "Nyx is a private AI chief of staff. Tools include chatting with the agent, \
-                 DeFi portfolio data, source credibility analysis, Docker container status, \
-                 session management, and ZEC privacy shield quotes."
+                "Nyx is an AI-powered productivity app. Tools include chatting with the agent, \
+                 DeFi portfolio data, source credibility analysis, IronClaw daemon status, \
+                 session management, schedule management, session history handoff, \
+                 ZEC privacy shield quotes, and confidential cross-chain \
+                 swaps via NEAR Confidential Intents (TEE-protected)."
                     .to_string(),
             ),
             capabilities: ServerCapabilities::builder().enable_tools().build(),

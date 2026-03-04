@@ -51,7 +51,7 @@ pub struct HealthStatus {
 
 pub fn defi_state_dir() -> PathBuf {
     let home = std::env::var("HOME").unwrap_or_default();
-    PathBuf::from(home).join(".openclaw/defi-state")
+    PathBuf::from(home).join(".nyx/defi-state")
 }
 
 /// Read current portfolio data from defi-state files.

@@ -535,12 +535,11 @@ pub fn tool_definition() -> serde_json::Value {
 /// Maximum tool-use iterations per request (safety limit).
 const MAX_ITERATIONS: usize = 25;
 
-/// Read the Anthropic API key from docker.env.
+/// Read the Anthropic API key from the Nyx .env file.
 fn read_anthropic_key() -> Result<String, String> {
-    let home = std::env::var("HOME").unwrap_or_default();
-    let env_path = std::path::PathBuf::from(&home).join("openclaw/docker.env");
+    let env_path = crate::ironclaw::config_dir().join(".env");
     let content = std::fs::read_to_string(&env_path)
-        .map_err(|e| format!("Failed to read docker.env: {}", e))?;
+        .map_err(|e| format!("Failed to read .env: {}", e))?;
     for line in content.lines() {
         if line.starts_with("ANTHROPIC_API_KEY=") {
             let key = line.trim_start_matches("ANTHROPIC_API_KEY=").to_string();
@@ -549,7 +548,7 @@ fn read_anthropic_key() -> Result<String, String> {
             }
         }
     }
-    Err("Anthropic API key not found in docker.env".to_string())
+    Err("Anthropic API key not found in .env".to_string())
 }
 
 /// Send a message to Claude with the browser tool and run the agent loop.

@@ -75,8 +75,8 @@
   let systemRam = $state(0);
   let customModelPulling = $state(false);
 
-  // Docker state
-  let dockerStatus = $state('checking');
+  // IronClaw daemon state
+  let ironclawStatus = $state('checking');
 
   // ClawdTalk (voice calling) state
   let clawdtalkConfigured = $state(false);
@@ -234,15 +234,15 @@
       // Take snapshot after loading
       snapshot = currentState();
 
-      // Load Ollama and Docker status in parallel
+      // Load Ollama and IronClaw status in parallel
       try {
-        const [ollama, docker, ram]: any = await Promise.all([
+        const [ollama, ironclaw, ram]: any = await Promise.all([
           invoke('check_ollama'),
-          invoke('docker_status'),
+          invoke('ironclaw_status'),
           invoke('get_system_ram'),
         ]);
         ollamaStatus = ollama.available ? 'running' : 'not_installed';
-        dockerStatus = docker.toLowerCase().includes('up') ? 'running' : 'stopped';
+        ironclawStatus = ironclaw.toLowerCase().includes('running') ? 'running' : 'stopped';
         systemRam = ram;
         if (ollama.available) {
           const models: any[] = await invoke('list_ollama_models');
@@ -250,7 +250,7 @@
         }
       } catch {
         ollamaStatus = 'not_installed';
-        dockerStatus = 'unknown';
+        ironclawStatus = 'unknown';
       }
 
       // Get app version
@@ -377,9 +377,9 @@
         // If restart required, do it
         if (result.restart_required) {
           try {
-            await invoke('restart_container');
+            await invoke('restart_ironclaw');
           } catch {
-            // Container might not be running — that's ok
+            // Daemon might not be running — that's ok
           }
         }
         // Show app restart notice if Activity Intelligence was just enabled
@@ -490,37 +490,37 @@
     }
   }
 
-  // ── Docker controls ──
-  async function startDocker() {
+  // ── IronClaw daemon controls ──
+  async function startIronClaw() {
     try {
       const { invoke } = await import('@tauri-apps/api/core');
-      dockerStatus = 'starting';
-      await invoke('docker_start');
-      dockerStatus = 'running';
+      ironclawStatus = 'starting';
+      await invoke('ironclaw_start');
+      ironclawStatus = 'running';
     } catch {
-      dockerStatus = 'error';
+      ironclawStatus = 'error';
     }
   }
 
-  async function stopDocker() {
+  async function stopIronClaw() {
     try {
       const { invoke } = await import('@tauri-apps/api/core');
-      dockerStatus = 'stopping';
-      await invoke('docker_stop');
-      dockerStatus = 'stopped';
+      ironclawStatus = 'stopping';
+      await invoke('ironclaw_stop');
+      ironclawStatus = 'stopped';
     } catch {
-      dockerStatus = 'error';
+      ironclawStatus = 'error';
     }
   }
 
-  async function restartDocker() {
+  async function restartIronClaw() {
     try {
       const { invoke } = await import('@tauri-apps/api/core');
-      dockerStatus = 'restarting';
-      await invoke('restart_container');
-      dockerStatus = 'running';
+      ironclawStatus = 'restarting';
+      await invoke('restart_ironclaw');
+      ironclawStatus = 'running';
     } catch {
-      dockerStatus = 'error';
+      ironclawStatus = 'error';
     }
   }
 
@@ -789,7 +789,7 @@
                 maxlength="32"
                 class="w-full bg-surface text-ivory text-sm px-4 py-2.5 rounded border border-border focus:border-gold-dim focus:outline-none transition-colors duration-300 selectable"
               />
-              <p class="text-ivory-muted/40 text-[10px] mt-1">Changing the agent name requires a container restart.</p>
+              <p class="text-ivory-muted/40 text-[10px] mt-1">Changing the agent name requires a daemon restart.</p>
             </div>
           </div>
         </SettingsSection>
@@ -1288,7 +1288,7 @@
                         Configured
                       </span>
                     {:else}
-                      <span class="text-warning text-[10px]">Not set — add key in docker.env</span>
+                      <span class="text-warning text-[10px]">Not set — add key in Settings</span>
                     {/if}
                   </div>
                   {#if !clawdtalkApiKeyEditing}
@@ -1440,7 +1440,7 @@
                       { name: 'nyx_chat', desc: 'Chat with agent' },
                       { name: 'nyx_portfolio', desc: 'DeFi portfolio' },
                       { name: 'nyx_verify_source', desc: 'Source verification' },
-                      { name: 'nyx_docker_status', desc: 'Container status' },
+                      { name: 'nyx_ironclaw_status', desc: 'Daemon status' },
                       { name: 'nyx_sessions', desc: 'Session management' },
                       { name: 'nyx_zec_quote', desc: 'ZEC shield quotes' },
                     ] as tool}
@@ -1597,7 +1597,7 @@
                 </div>
               </div>
 
-              <!-- App restart notice (observer runs in the Tauri process, not Docker) -->
+              <!-- App restart notice (observer runs in the Tauri process, not the daemon) -->
               {#if showAppRestartNotice}
                 <div class="px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-start gap-2">
                   <svg class="w-3.5 h-3.5 text-amber-300 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
@@ -1725,32 +1725,32 @@
         <!-- ═══════════════ 8. System Status ═══════════════ -->
         <SettingsSection title="System Status" icon={icons.server}>
           <div class="space-y-4">
-            <!-- Docker container -->
+            <!-- IronClaw daemon -->
             <div class="flex items-center justify-between">
               <div>
-                <p class="text-ivory text-sm">Docker Container</p>
-                <p class="text-xs {dockerStatus === 'running' ? 'text-positive' : dockerStatus === 'stopped' ? 'text-ivory-muted/50' : 'text-warning'}">
-                  {#if dockerStatus === 'running'}Running
-                  {:else if dockerStatus === 'stopped'}Stopped
-                  {:else if dockerStatus === 'starting' || dockerStatus === 'restarting'}Starting...
-                  {:else if dockerStatus === 'stopping'}Stopping...
+                <p class="text-ivory text-sm">IronClaw Daemon</p>
+                <p class="text-xs {ironclawStatus === 'running' ? 'text-positive' : ironclawStatus === 'stopped' ? 'text-ivory-muted/50' : 'text-warning'}">
+                  {#if ironclawStatus === 'running'}Running
+                  {:else if ironclawStatus === 'stopped'}Stopped
+                  {:else if ironclawStatus === 'starting' || ironclawStatus === 'restarting'}Starting...
+                  {:else if ironclawStatus === 'stopping'}Stopping...
                   {:else}Unknown
                   {/if}
                 </p>
               </div>
               <div class="flex items-center gap-2">
-                {#if dockerStatus === 'running'}
-                  <button onclick={restartDocker} class="px-3 py-1 text-[10px] tracking-wider uppercase rounded border border-border text-ivory-muted hover:text-ivory hover:border-ivory-muted/30 transition-colors">
+                {#if ironclawStatus === 'running'}
+                  <button onclick={restartIronClaw} class="px-3 py-1 text-[10px] tracking-wider uppercase rounded border border-border text-ivory-muted hover:text-ivory hover:border-ivory-muted/30 transition-colors">
                     Restart
                   </button>
-                  <button onclick={stopDocker} class="px-3 py-1 text-[10px] tracking-wider uppercase rounded border border-negative/30 text-negative/70 hover:text-negative hover:border-negative/50 transition-colors">
+                  <button onclick={stopIronClaw} class="px-3 py-1 text-[10px] tracking-wider uppercase rounded border border-negative/30 text-negative/70 hover:text-negative hover:border-negative/50 transition-colors">
                     Stop
                   </button>
-                {:else if dockerStatus === 'stopped'}
-                  <button onclick={startDocker} class="px-3 py-1 text-[10px] tracking-wider uppercase rounded border border-positive/30 text-positive/70 hover:text-positive hover:border-positive/50 transition-colors">
+                {:else if ironclawStatus === 'stopped'}
+                  <button onclick={startIronClaw} class="px-3 py-1 text-[10px] tracking-wider uppercase rounded border border-positive/30 text-positive/70 hover:text-positive hover:border-positive/50 transition-colors">
                     Start
                   </button>
-                {:else if dockerStatus === 'starting' || dockerStatus === 'restarting' || dockerStatus === 'stopping'}
+                {:else if ironclawStatus === 'starting' || ironclawStatus === 'restarting' || ironclawStatus === 'stopping'}
                   <div class="w-4 h-4 border-2 border-gold/40 border-t-gold rounded-full animate-spin"></div>
                 {/if}
               </div>

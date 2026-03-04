@@ -36,6 +36,11 @@ pub struct QuoteRequest {
     pub recipient: String,
     pub recipient_type: String,
     pub deadline: String,
+    /// Forward-compatible confidential intents flag (NEAR private shard / TEE).
+    /// Ignored by the 1Click API today; will activate when NEAR ships the
+    /// confidential swap endpoint.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub confidential: Option<bool>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -177,6 +182,8 @@ pub async fn get_tokens() -> Result<Vec<TokenInfo>, String> {
 }
 
 /// Request a swap quote from the 1Click API (v2 schema).
+/// When `confidential` is true, the request includes the confidential flag
+/// for NEAR's private shard / TEE execution (forward-compatible).
 pub async fn get_quote(
     origin_asset: &str,
     destination_asset: &str,
@@ -184,6 +191,7 @@ pub async fn get_quote(
     recipient: &str,
     refund_to: &str,
     dry_run: bool,
+    confidential: bool,
 ) -> Result<QuoteResponse, String> {
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(30))
@@ -205,6 +213,7 @@ pub async fn get_quote(
         recipient: recipient.to_string(),
         recipient_type: "DESTINATION_CHAIN".to_string(),
         deadline: deadline_10min(),
+        confidential: if confidential { Some(true) } else { None },
     };
 
     let response = client
@@ -242,6 +251,7 @@ pub async fn get_zec_quote(
         zec_address,
         refund_to,
         true, // dry run — user must confirm before executing
+        false,
     )
     .await
 }
@@ -260,6 +270,7 @@ pub async fn get_quote_from_zec(
         recipient,
         zec_refund,
         true,
+        false,
     )
     .await
 }
@@ -278,6 +289,7 @@ pub async fn execute_zec_shield(
         zec_address,
         refund_to,
         false, // live execution
+        false,
     )
     .await
 }
@@ -296,6 +308,53 @@ pub async fn execute_zec_unshield(
         recipient,
         zec_refund,
         false, // live execution
+        false,
+    )
+    .await
+}
+
+// ---------------------------------------------------------------------------
+// Confidential Intents (NEAR private shard / TEE)
+// ---------------------------------------------------------------------------
+
+/// Get a confidential swap quote (any asset → any asset, TEE-protected).
+/// Uses NEAR Confidential Intents: execution in a private shard prevents
+/// MEV, frontrunning, and strategy leakage.
+pub async fn get_confidential_quote(
+    origin_asset: &str,
+    destination_asset: &str,
+    amount: &str,
+    recipient: &str,
+    refund_to: &str,
+) -> Result<QuoteResponse, String> {
+    get_quote(
+        origin_asset,
+        destination_asset,
+        amount,
+        recipient,
+        refund_to,
+        true, // dry run
+        true, // confidential
+    )
+    .await
+}
+
+/// Execute a confidential swap (any asset → any asset, TEE-protected).
+pub async fn execute_confidential_swap(
+    origin_asset: &str,
+    destination_asset: &str,
+    amount: &str,
+    recipient: &str,
+    refund_to: &str,
+) -> Result<QuoteResponse, String> {
+    get_quote(
+        origin_asset,
+        destination_asset,
+        amount,
+        recipient,
+        refund_to,
+        false, // live execution
+        true,  // confidential
     )
     .await
 }

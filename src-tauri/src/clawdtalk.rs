@@ -33,7 +33,7 @@ pub struct ClawdTalkStatus {
 
 /// ClawdTalk skill directory
 fn skill_dir() -> PathBuf {
-    config::home_dir().join("openclaw/local-skills/clawdtalk")
+    config::home_dir().join(".nyx/local-skills/clawdtalk")
 }
 
 fn config_path() -> PathBuf {
@@ -62,7 +62,7 @@ pub fn check_status() -> Result<ClawdTalkStatus, String> {
 
     if configured {
         if let Ok(content) = fs::read_to_string(&config) {
-            // Resolve env vars from docker.env
+            // Resolve env vars from .env
             let resolved = resolve_env_vars(&content);
             if let Ok(cfg) = serde_json::from_str::<serde_json::Value>(&resolved) {
                 let key = cfg.get("api_key")
@@ -206,7 +206,7 @@ pub async fn start_connection() -> Result<ClawdTalkStatus, String> {
     // Source env vars — we need to resolve ${VAR} in skill-config.json
     // The ws-client.js handles this itself via resolve_config, but we need
     // the env vars available in the process environment
-    let env_path = config::home_dir().join("openclaw/docker.env");
+    let env_path = config::home_dir().join(".nyx/.env");
     let mut env_vars: Vec<(String, String)> = Vec::new();
     if let Ok(content) = fs::read_to_string(&env_path) {
         for line in content.lines() {
@@ -292,119 +292,17 @@ pub fn get_logs(lines: usize) -> Result<Vec<String>, String> {
 }
 
 // ---------------------------------------------------------------------------
-// Voice agent config for OpenClaw gateway
+// Voice agent config (no-op under IronClaw — the OpenClaw voice agent
+// concept does not apply to the IronClaw gateway)
 // ---------------------------------------------------------------------------
 
-/// Add voice agent to openclaw.json if not already present.
-/// Also enables chatCompletions endpoint.
+/// No-op: IronClaw does not use OpenClaw-style voice agent configuration.
 pub fn configure_gateway_voice_agent() -> Result<(), String> {
-    let home = config::home_dir();
-    let config_path = home.join(".openclaw/openclaw.json");
-
-    if !config_path.exists() {
-        return Err("openclaw.json not found — run setup first".to_string());
-    }
-
-    let content = fs::read_to_string(&config_path)
-        .map_err(|e| format!("Failed to read openclaw.json: {}", e))?;
-    let mut config: serde_json::Value = serde_json::from_str(&content)
-        .map_err(|e| format!("Failed to parse openclaw.json: {}", e))?;
-
-    // Check if voice agent already exists
-    let has_voice = config
-        .pointer("/agents/list")
-        .and_then(|list| list.as_array())
-        .map_or(false, |list| {
-            list.iter().any(|a| a.get("id").and_then(|v| v.as_str()) == Some("voice"))
-        });
-
-    if !has_voice {
-        // Get main agent name for voice agent naming
-        let main_name = config
-            .pointer("/agents/list/0/identity/name")
-            .and_then(|v| v.as_str())
-            .unwrap_or("Nyx");
-        let voice_name = format!("{} Voice", main_name);
-
-        // Get workspace from main agent
-        let workspace = config
-            .pointer("/agents/list/0/workspace")
-            .and_then(|v| v.as_str())
-            .unwrap_or("/home/node/.openclaw/workspace");
-
-        let voice_agent = serde_json::json!({
-            "id": "voice",
-            "name": voice_name,
-            "workspace": workspace
-        });
-
-        // Add to agents.list
-        if let Some(list) = config.pointer_mut("/agents/list").and_then(|v| v.as_array_mut()) {
-            list.push(voice_agent);
-        }
-    }
-
-    // Enable chatCompletions endpoint
-    // Ensure gateway.http.endpoints.chatCompletions.enabled = true
-    if config.pointer("/gateway/http").is_none() {
-        if let Some(gw) = config.pointer_mut("/gateway") {
-            if let Some(obj) = gw.as_object_mut() {
-                obj.insert("http".to_string(), serde_json::json!({
-                    "endpoints": {
-                        "chatCompletions": { "enabled": true }
-                    }
-                }));
-            }
-        }
-    } else {
-        // Navigate/create the path
-        let gw = config.pointer_mut("/gateway").unwrap();
-        let http = gw.as_object_mut().unwrap()
-            .entry("http").or_insert_with(|| serde_json::json!({}));
-        let endpoints = http.as_object_mut()
-            .ok_or("Invalid gateway.http")?
-            .entry("endpoints").or_insert_with(|| serde_json::json!({}));
-        let chat = endpoints.as_object_mut()
-            .ok_or("Invalid endpoints")?
-            .entry("chatCompletions").or_insert_with(|| serde_json::json!({}));
-        if let Some(obj) = chat.as_object_mut() {
-            obj.insert("enabled".to_string(), serde_json::json!(true));
-        }
-    }
-
-    // Write back
-    let updated = serde_json::to_string_pretty(&config)
-        .map_err(|e| format!("Failed to serialize: {}", e))?;
-    fs::write(&config_path, updated)
-        .map_err(|e| format!("Failed to write openclaw.json: {}", e))?;
-
     Ok(())
 }
 
-/// Remove voice agent from openclaw.json.
+/// No-op: IronClaw does not use OpenClaw-style voice agent configuration.
 pub fn remove_gateway_voice_agent() -> Result<(), String> {
-    let home = config::home_dir();
-    let config_path = home.join(".openclaw/openclaw.json");
-
-    if !config_path.exists() {
-        return Ok(());
-    }
-
-    let content = fs::read_to_string(&config_path)
-        .map_err(|e| format!("Failed to read: {}", e))?;
-    let mut config: serde_json::Value = serde_json::from_str(&content)
-        .map_err(|e| format!("Failed to parse: {}", e))?;
-
-    // Remove voice agent from list
-    if let Some(list) = config.pointer_mut("/agents/list").and_then(|v| v.as_array_mut()) {
-        list.retain(|a| a.get("id").and_then(|v| v.as_str()) != Some("voice"));
-    }
-
-    let updated = serde_json::to_string_pretty(&config)
-        .map_err(|e| format!("Failed to serialize: {}", e))?;
-    fs::write(&config_path, updated)
-        .map_err(|e| format!("Failed to write: {}", e))?;
-
     Ok(())
 }
 
@@ -412,9 +310,9 @@ pub fn remove_gateway_voice_agent() -> Result<(), String> {
 // Helpers
 // ---------------------------------------------------------------------------
 
-/// Resolve ${VAR} references in a string using docker.env values.
+/// Resolve ${VAR} references in a string using .env values.
 fn resolve_env_vars(content: &str) -> String {
-    let env_path = config::home_dir().join("openclaw/docker.env");
+    let env_path = config::home_dir().join(".nyx/.env");
     let mut resolved = content.to_string();
 
     if let Ok(env_content) = fs::read_to_string(&env_path) {

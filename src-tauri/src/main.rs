@@ -5,6 +5,7 @@
 use nyx_lib::config;
 use nyx_lib::docker;
 use nyx_lib::gateway;
+use nyx_lib::ironclaw;
 use nyx_lib::oneclick;
 use nyx_lib::wallet;
 
@@ -289,6 +290,7 @@ async fn get_cross_chain_quote(
         &recipient,
         &refund_to,
         dry_run.unwrap_or(true),
+        false,
     )
     .await
 }
@@ -360,7 +362,50 @@ fn get_shieldable_assets() -> Vec<oneclick::ShieldableAsset> {
 }
 
 // ---------------------------------------------------------------------------
-// Container lifecycle
+// Confidential Intents (NEAR private shard / TEE)
+// ---------------------------------------------------------------------------
+
+/// Get a confidential cross-chain swap quote. Executes via NEAR's TEE-secured
+/// private shard — prevents MEV, frontrunning, and strategy leakage.
+#[tauri::command]
+async fn get_confidential_quote(
+    origin_asset: String,
+    destination_asset: String,
+    amount: String,
+) -> Result<oneclick::QuoteResponse, String> {
+    let near_account = config::get_near_account()
+        .unwrap_or_else(|| "nyx.near".to_string());
+    oneclick::get_confidential_quote(
+        &origin_asset,
+        &destination_asset,
+        &amount,
+        &near_account,
+        &near_account,
+    )
+    .await
+}
+
+/// Execute a confidential cross-chain swap (live, not dry run).
+#[tauri::command]
+async fn execute_confidential_swap(
+    origin_asset: String,
+    destination_asset: String,
+    amount: String,
+) -> Result<oneclick::QuoteResponse, String> {
+    let near_account = config::get_near_account()
+        .unwrap_or_else(|| "nyx.near".to_string());
+    oneclick::execute_confidential_swap(
+        &origin_asset,
+        &destination_asset,
+        &amount,
+        &near_account,
+        &near_account,
+    )
+    .await
+}
+
+// ---------------------------------------------------------------------------
+// Container lifecycle (legacy Docker — kept for rollback)
 // ---------------------------------------------------------------------------
 
 #[tauri::command]
@@ -376,6 +421,45 @@ async fn docker_stop() -> Result<(), String> {
 #[tauri::command]
 async fn docker_status() -> Result<String, String> {
     docker::container_status().await
+}
+
+// ---------------------------------------------------------------------------
+// IronClaw daemon lifecycle
+// ---------------------------------------------------------------------------
+
+#[tauri::command]
+async fn check_ironclaw() -> Result<bool, String> {
+    ironclaw::is_daemon_running().await
+}
+
+#[tauri::command]
+async fn check_ironclaw_detailed() -> Result<ironclaw::IronClawCheck, String> {
+    ironclaw::check_ironclaw_detailed().await
+}
+
+#[tauri::command]
+async fn install_ironclaw() -> Result<String, String> {
+    ironclaw::install_ironclaw().await
+}
+
+#[tauri::command]
+async fn ironclaw_start() -> Result<(), String> {
+    ironclaw::start_daemon().await
+}
+
+#[tauri::command]
+async fn ironclaw_stop() -> Result<(), String> {
+    ironclaw::stop_daemon().await
+}
+
+#[tauri::command]
+async fn ironclaw_status() -> Result<String, String> {
+    ironclaw::daemon_status().await
+}
+
+#[tauri::command]
+async fn restart_ironclaw() -> Result<(), String> {
+    ironclaw::restart_daemon().await
 }
 
 // ---------------------------------------------------------------------------
@@ -425,25 +509,27 @@ async fn get_system_ram() -> Result<u64, String> {
 // Agent identity
 // ---------------------------------------------------------------------------
 
-/// Read the configured agent name from openclaw.json (fallback: "Nyx").
+/// Read the configured agent name from IronClaw config.toml (fallback: "Nyx").
 #[tauri::command]
 fn get_agent_name() -> Result<String, String> {
-    let home = std::env::var("HOME").unwrap_or_default();
-    let config_path = std::path::PathBuf::from(&home).join(".openclaw/openclaw.json");
+    let config_path = ironclaw::config_dir().join("config.toml");
     let content = match std::fs::read_to_string(&config_path) {
         Ok(c) => c,
         Err(_) => return Ok("Nyx".to_string()),
     };
-    let json: serde_json::Value = match serde_json::from_str(&content) {
-        Ok(j) => j,
-        Err(_) => return Ok("Nyx".to_string()),
-    };
-    let name = json
-        .pointer("/agents/list/0/identity/name")
-        .and_then(|v| v.as_str())
-        .unwrap_or("Nyx")
-        .to_string();
-    Ok(name)
+    // Simple TOML parsing — look for agent.name
+    for line in content.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with("name") && trimmed.contains('=') {
+            if let Some(val) = trimmed.split('=').nth(1) {
+                let name = val.trim().trim_matches('"').to_string();
+                if !name.is_empty() {
+                    return Ok(name);
+                }
+            }
+        }
+    }
+    Ok("Nyx".to_string())
 }
 
 // ---------------------------------------------------------------------------
@@ -462,7 +548,8 @@ fn save_settings(update: config::SettingsUpdate) -> Result<config::SettingsSaveR
 
 #[tauri::command]
 async fn restart_container() -> Result<(), String> {
-    docker::restart_container().await
+    // Now restarts IronClaw daemon instead of Docker container
+    ironclaw::restart_daemon().await
 }
 
 // ---------------------------------------------------------------------------
@@ -661,18 +748,16 @@ fn clawdtalk_status() -> Result<clawdtalk::ClawdTalkStatus, String> {
 
 #[tauri::command]
 fn clawdtalk_configure(api_key: String) -> Result<(), String> {
-    // Store the raw API key in docker.env, reference via env var in skill config
-    let home = config::home_dir();
-    let env_path = home.join("openclaw/docker.env");
+    // Store the raw API key in .env
+    let env_path = ironclaw::config_dir().join(".env");
 
-    // Read existing docker.env
+    // Read existing .env
     let content = std::fs::read_to_string(&env_path).unwrap_or_default();
 
     // Check if CLAWDTALK_API_KEY already exists
     let has_key = content.lines().any(|l| l.trim().starts_with("CLAWDTALK_API_KEY="));
 
     let updated = if has_key {
-        // Replace existing line
         content.lines()
             .map(|l| {
                 if l.trim().starts_with("CLAWDTALK_API_KEY=") {
@@ -684,12 +769,11 @@ fn clawdtalk_configure(api_key: String) -> Result<(), String> {
             .collect::<Vec<_>>()
             .join("\n")
     } else {
-        // Append to end
         format!("{}\n# ClawdTalk Voice\nCLAWDTALK_API_KEY={}\n", content.trim_end(), api_key)
     };
 
     std::fs::write(&env_path, updated)
-        .map_err(|e| format!("Failed to update docker.env: {}", e))?;
+        .map_err(|e| format!("Failed to update .env: {}", e))?;
 
     // chmod 600
     #[cfg(unix)]
@@ -720,9 +804,8 @@ fn clawdtalk_remove() -> Result<(), String> {
     clawdtalk::remove_config()?;
     clawdtalk::remove_gateway_voice_agent()?;
 
-    // Remove key from docker.env
-    let home = config::home_dir();
-    let env_path = home.join("openclaw/docker.env");
+    // Remove key from .env
+    let env_path = ironclaw::config_dir().join(".env");
     if let Ok(content) = std::fs::read_to_string(&env_path) {
         let updated: Vec<&str> = content.lines()
             .filter(|l| !l.trim().starts_with("CLAWDTALK_API_KEY=") && l.trim() != "# ClawdTalk Voice")
@@ -746,6 +829,97 @@ fn clawdtalk_stop() -> Result<clawdtalk::ClawdTalkStatus, String> {
 #[tauri::command]
 fn clawdtalk_logs() -> Result<Vec<String>, String> {
     clawdtalk::get_logs(20)
+}
+
+// ---------------------------------------------------------------------------
+// Session history
+// ---------------------------------------------------------------------------
+
+#[tauri::command]
+fn get_session_history(
+    session_key: String,
+    limit: Option<usize>,
+) -> Result<Vec<gateway::HistoryMessage>, String> {
+    gateway::load_session_history(&session_key, limit.unwrap_or(50))
+}
+
+// ---------------------------------------------------------------------------
+// Scheduling (cron job CRUD)
+// ---------------------------------------------------------------------------
+
+#[tauri::command]
+fn list_scheduled_tasks() -> Result<Vec<config::CronJob>, String> {
+    let file = config::read_cron_jobs()?;
+    Ok(file.jobs)
+}
+
+#[tauri::command]
+fn create_scheduled_task(
+    name: String,
+    schedule_kind: String,
+    schedule_value: String,
+    timezone: Option<String>,
+    message: String,
+    enabled: Option<bool>,
+) -> Result<config::CronJob, String> {
+    let schedule = match schedule_kind.as_str() {
+        "every" => {
+            let ms: u64 = schedule_value
+                .parse()
+                .map_err(|_| "schedule_value must be a number (milliseconds) for 'every' kind")?;
+            config::CronSchedule::Every { every_ms: ms, anchor_ms: None }
+        }
+        "cron" => config::CronSchedule::Cron {
+            expr: schedule_value,
+            tz: timezone,
+        },
+        other => return Err(format!("Unknown schedule_kind '{}'. Use 'every' or 'cron'.", other)),
+    };
+
+    config::create_cron_job(name, schedule, message, enabled.unwrap_or(true))
+}
+
+#[tauri::command]
+fn update_scheduled_task(
+    id: String,
+    name: Option<String>,
+    schedule_kind: Option<String>,
+    schedule_value: Option<String>,
+    timezone: Option<String>,
+    message: Option<String>,
+    enabled: Option<bool>,
+) -> Result<config::CronJob, String> {
+    let schedule = match (schedule_kind.as_deref(), schedule_value) {
+        (Some("every"), Some(val)) => {
+            let ms: u64 = val
+                .parse()
+                .map_err(|_| "schedule_value must be a number (milliseconds) for 'every' kind")?;
+            Some(config::CronSchedule::Every { every_ms: ms, anchor_ms: None })
+        }
+        (Some("cron"), Some(val)) => Some(config::CronSchedule::Cron {
+            expr: val,
+            tz: timezone,
+        }),
+        (Some(other), _) => {
+            return Err(format!("Unknown schedule_kind '{}'. Use 'every' or 'cron'.", other))
+        }
+        _ => None,
+    };
+
+    config::update_cron_job(
+        &id,
+        config::CronJobUpdate {
+            name,
+            schedule,
+            message,
+            enabled,
+        },
+    )
+}
+
+#[tauri::command]
+fn delete_scheduled_task(id: String) -> Result<(), String> {
+    config::delete_cron_job(&id)
 }
 
 // ---------------------------------------------------------------------------
@@ -791,6 +965,7 @@ fn main() {
             create_chat_folder,
             rename_chat_folder,
             delete_chat_folder,
+            get_session_history,
             // Source Intelligence
             verify_source,
             // 1Click API
@@ -804,10 +979,21 @@ fn main() {
             get_shieldable_assets,
             execute_zec_shield,
             execute_zec_unshield,
-            // Container
+            // Confidential Intents (NEAR TEE)
+            get_confidential_quote,
+            execute_confidential_swap,
+            // Container (legacy Docker)
             docker_start,
             docker_stop,
             docker_status,
+            // IronClaw daemon
+            check_ironclaw,
+            check_ironclaw_detailed,
+            install_ironclaw,
+            ironclaw_start,
+            ironclaw_stop,
+            ironclaw_status,
+            restart_ironclaw,
             // Ollama (local models)
             check_ollama,
             install_ollama,
@@ -822,6 +1008,11 @@ fn main() {
             read_current_config,
             save_settings,
             restart_container,
+            // Scheduling
+            list_scheduled_tasks,
+            create_scheduled_task,
+            update_scheduled_task,
+            delete_scheduled_task,
             // ClawdTalk (voice)
             clawdtalk_status,
             clawdtalk_configure,

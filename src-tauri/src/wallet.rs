@@ -217,10 +217,10 @@ pub fn import_wallet(chain: Chain, address: String, label: String) -> Result<Wal
 // Persistence helpers
 // ---------------------------------------------------------------------------
 
-/// Return the base secrets directory: `~/.openclaw/secrets`
+/// Return the base secrets directory: `~/.nyx/secrets`
 fn secrets_dir() -> Result<PathBuf, String> {
     let home = std::env::var("HOME").map_err(|_| "HOME not set".to_string())?;
-    Ok(PathBuf::from(home).join(".openclaw/secrets"))
+    Ok(PathBuf::from(home).join(".nyx/secrets"))
 }
 
 /// Save wallet credentials to the legacy `near_account.json` location.
@@ -247,7 +247,7 @@ pub fn save_wallet(wallet: &WalletInfo, secrets_dir: &std::path::Path) -> Result
 }
 
 /// Save a wallet's private-key material to
-/// `~/.openclaw/secrets/wallets/{wallet_id}.json`.
+/// `~/.nyx/secrets/wallets/{wallet_id}.json`.
 pub fn save_wallet_key(wallet_id: &str, wallet_info: &WalletInfo) -> Result<(), String> {
     let wallets_dir = secrets_dir()?.join("wallets");
 
@@ -272,7 +272,7 @@ pub fn save_wallet_key(wallet_id: &str, wallet_info: &WalletInfo) -> Result<(), 
 }
 
 /// Load a wallet's private-key material from
-/// `~/.openclaw/secrets/wallets/{wallet_id}.json`.
+/// `~/.nyx/secrets/wallets/{wallet_id}.json`.
 /// Returns `Ok(None)` when the file does not exist.
 pub fn load_wallet_key(wallet_id: &str) -> Result<Option<WalletInfo>, String> {
     let path = secrets_dir()?.join("wallets").join(format!("{}.json", wallet_id));

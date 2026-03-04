@@ -5,6 +5,7 @@
 pub mod config;
 pub mod docker;
 pub mod gateway;
+pub mod ironclaw;
 pub mod oneclick;
 pub mod wallet;
 

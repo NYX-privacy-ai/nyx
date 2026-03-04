@@ -22,7 +22,8 @@
     { href: '/browse', icon: 'browse', label: 'Browse' },
     { href: '/code', icon: 'code', label: 'Code' },
     { href: '/verify', icon: 'verify', label: 'Verify' },
-    { href: '/privacy', icon: 'privacy', label: 'Privacy' }
+    { href: '/privacy', icon: 'privacy', label: 'Privacy' },
+    { href: '/schedules', icon: 'schedules', label: 'Schedules' }
   ];
 
   function isActive(href: string, pathname: string) {
@@ -152,6 +153,10 @@
           {:else if item.icon === 'privacy'}
             <svg class="w-5 h-5 transition-colors duration-300" class:text-gold={isActive(item.href, $page.url.pathname)} class:text-ivory-muted={!isActive(item.href, $page.url.pathname)} fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
               <path d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+            </svg>
+          {:else if item.icon === 'schedules'}
+            <svg class="w-5 h-5 transition-colors duration-300" class:text-gold={isActive(item.href, $page.url.pathname)} class:text-ivory-muted={!isActive(item.href, $page.url.pathname)} fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+              <path d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
           {/if}
 

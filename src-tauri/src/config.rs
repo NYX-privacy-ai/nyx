@@ -359,23 +359,22 @@ fn parse_env_file(path: &Path) -> Result<std::collections::HashMap<String, Strin
 pub fn read_current_config() -> Result<SettingsConfig, String> {
     let home = home_dir();
 
-    // Parse docker.env
-    let env_path = home.join("openclaw/docker.env");
+    // Parse .env
+    let env_path = home.join(".nyx/.env");
     let env = parse_env_file(&env_path)?;
 
-    // Parse openclaw.json
-    let config_path = home.join(".openclaw/openclaw.json");
-    let config_content = fs::read_to_string(&config_path)
-        .map_err(|e| format!("Failed to read openclaw.json: {}", e))?;
-    let config_json: serde_json::Value = serde_json::from_str(&config_content)
-        .map_err(|e| format!("Failed to parse openclaw.json: {}", e))?;
-
-    // Agent name
-    let agent_name = config_json
-        .pointer("/agents/list/0/identity/name")
-        .and_then(|v| v.as_str())
-        .unwrap_or("Nyx")
-        .to_string();
+    // Read agent name from config.toml
+    let config_path = home.join(".nyx/config.toml");
+    let agent_name = if let Ok(content) = fs::read_to_string(&config_path) {
+        content.lines()
+            .find(|l| l.trim().starts_with("name") && l.contains('='))
+            .and_then(|l| l.split('=').nth(1))
+            .map(|v| v.trim().trim_matches('"').to_string())
+            .filter(|s| !s.is_empty())
+            .unwrap_or_else(|| "Nyx".to_string())
+    } else {
+        "Nyx".to_string()
+    };
 
     // Key presence (never expose actual values)
     let has_key = |k: &str| env.get(k).map_or(false, |v| !v.is_empty());
@@ -465,11 +464,10 @@ pub fn read_current_config() -> Result<SettingsConfig, String> {
             .cloned(),
     };
 
-    // WhatsApp phone from openclaw.json
-    let whatsapp_phone = config_json
-        .pointer("/channels/whatsapp/allowFrom/0")
-        .and_then(|v| v.as_str())
-        .map(|s| s.to_string());
+    // WhatsApp phone from env
+    let whatsapp_phone = env.get("WHATSAPP_PHONE")
+        .filter(|v| !v.is_empty())
+        .cloned();
 
     Ok(SettingsConfig {
         agent_name,
@@ -492,7 +490,7 @@ pub fn read_current_config() -> Result<SettingsConfig, String> {
 
 /// Read email notification config from cron/jobs.json.
 fn read_email_config(home: &Path) -> EmailNotificationsConfig {
-    let cron_path = home.join(".openclaw/cron/jobs.json");
+    let cron_path = home.join(".nyx/cron/jobs.json");
     let content = match fs::read_to_string(&cron_path) {
         Ok(c) => c,
         Err(_) => return EmailNotificationsConfig::default(),
@@ -550,7 +548,7 @@ fn read_email_config(home: &Path) -> EmailNotificationsConfig {
 /// Apply settings update. Reads existing config, merges changes, writes all files.
 pub fn save_settings(update: SettingsUpdate) -> Result<SettingsSaveResult, String> {
     let home = home_dir();
-    let env_path = home.join("openclaw/docker.env");
+    let env_path = home.join(".nyx/.env");
     let env = parse_env_file(&env_path)?;
 
     // Read existing values to preserve unchanged fields
@@ -617,7 +615,7 @@ pub fn save_settings(update: SettingsUpdate) -> Result<SettingsSaveResult, Strin
     if update.capabilities.is_some() { restart_required = true; }
 
     // Preserve gateway token from existing env
-    let gateway_token = env.get("OPENCLAW_GATEWAY_TOKEN")
+    let gateway_token = env.get("GATEWAY_AUTH_TOKEN")
         .cloned()
         .unwrap_or_else(generate_token);
 
@@ -670,14 +668,14 @@ pub fn save_settings(update: SettingsUpdate) -> Result<SettingsSaveResult, Strin
     };
 
     // Write all config files
-    write_docker_env(&setup_config)?;
-    write_openclaw_config(&setup_config)?;
+    write_nyx_env(&setup_config)?;
+    write_ironclaw_config(&setup_config)?;
     write_guardrails(&setup_config.guardrails)?;
     write_cron_jobs(&setup_config)?;
 
     // Update SOUL.md if agent name changed
     if update.agent_name.is_some() && update.agent_name.as_deref() != Some(&existing.agent_name) {
-        let soul_path = home.join("openclaw/workspace/SOUL.md");
+        let soul_path = home.join(".nyx/workspace/SOUL.md");
         if let Ok(soul_content) = fs::read_to_string(&soul_path) {
             let updated_soul = soul_content.replace(
                 &format!("You're {}", existing.agent_name),
@@ -691,7 +689,7 @@ pub fn save_settings(update: SettingsUpdate) -> Result<SettingsSaveResult, Strin
         success: true,
         restart_required,
         message: if restart_required {
-            "Settings saved. Container restart required for changes to take effect.".to_string()
+            "Settings saved. Daemon restart required for changes to take effect.".to_string()
         } else {
             "Settings saved.".to_string()
         },
@@ -702,10 +700,10 @@ pub fn save_settings(update: SettingsUpdate) -> Result<SettingsSaveResult, Strin
 // ZEC / NEAR address helpers (used by shield/unshield commands)
 // ---------------------------------------------------------------------------
 
-/// Get the configured ZEC wallet address from docker.env wallets.
+/// Get the configured ZEC wallet address from .env wallets.
 pub fn get_zec_address() -> Option<String> {
     let home = home_dir();
-    let env_path = home.join("openclaw/docker.env");
+    let env_path = home.join(".nyx/.env");
     let env = parse_env_file(&env_path).ok()?;
 
     let wallet_count: usize = env.get("WALLET_COUNT")
@@ -724,10 +722,10 @@ pub fn get_zec_address() -> Option<String> {
     None
 }
 
-/// Get the configured NEAR account ID from docker.env wallets.
+/// Get the configured NEAR account ID from .env wallets.
 pub fn get_near_account() -> Option<String> {
     let home = home_dir();
-    let env_path = home.join("openclaw/docker.env");
+    let env_path = home.join(".nyx/.env");
     let env = parse_env_file(&env_path).ok()?;
 
     // Check for explicit NEAR_ACCOUNT_ID first
@@ -762,19 +760,16 @@ pub fn get_near_account() -> Option<String> {
 pub fn create_directories() -> Result<(), String> {
     let home = home_dir();
     let dirs = vec![
-        home.join("openclaw/workspace"),
-        home.join("openclaw/local-skills/near-intents"),
-        home.join("openclaw/local-skills/gog"),
-        home.join("openclaw/near-intents-helper"),
-        home.join("openclaw/bin"),
-        home.join("openclaw/patches/dist"),
-        home.join(".openclaw/secrets"),
-        home.join(".openclaw/cron"),
-        home.join(".openclaw/playwright"),
-        home.join(".openclaw/browser-libs"),
-        home.join(".openclaw/gogcli"),
-        home.join(".openclaw/defi-state/logs"),
-        home.join(".openclaw/agents/default/sessions"),
+        home.join(".nyx/workspace"),
+        home.join(".nyx/local-skills/near-intents"),
+        home.join(".nyx/local-skills/gog"),
+        home.join(".nyx/near-intents-helper"),
+        home.join(".nyx/bin"),
+        home.join(".nyx/secrets"),
+        home.join(".nyx/cron"),
+        home.join(".nyx/gogcli"),
+        home.join(".nyx/defi-state/logs"),
+        home.join(".nyx/logs"),
     ];
 
     for dir in dirs {
@@ -786,7 +781,7 @@ pub fn create_directories() -> Result<(), String> {
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        let secrets = home.join(".openclaw/secrets");
+        let secrets = home.join(".nyx/secrets");
         fs::set_permissions(&secrets, fs::Permissions::from_mode(0o700))
             .map_err(|e| format!("Failed to set secrets permissions: {}", e))?;
     }
@@ -795,20 +790,37 @@ pub fn create_directories() -> Result<(), String> {
 }
 
 // ---------------------------------------------------------------------------
-// docker.env
+// .env (IronClaw environment)
 // ---------------------------------------------------------------------------
 
-/// Generate docker.env from config.
-pub fn write_docker_env(config: &SetupConfig) -> Result<(), String> {
+/// Generate .env from config.
+pub fn write_nyx_env(config: &SetupConfig) -> Result<(), String> {
     let home = home_dir();
-    let path = home.join("openclaw/docker.env");
+    let path = home.join(".nyx/.env");
+
+    // Determine gateway port: preserve existing value from .env, or pick an
+    // available port (avoids collision with other IronClaw instances like Atlas).
+    let gateway_port = {
+        let existing = if let Ok(contents) = fs::read_to_string(&path) {
+            contents.lines()
+                .find(|l| l.starts_with("GATEWAY_PORT="))
+                .and_then(|l| l.strip_prefix("GATEWAY_PORT="))
+                .and_then(|v| v.trim().parse::<u16>().ok())
+        } else {
+            None
+        };
+        existing.unwrap_or_else(crate::ironclaw::pick_available_port)
+    };
 
     let mut content = format!(
-        "# Nyx Docker Environment\n\
-         OPENCLAW_GATEWAY_TOKEN={}\n\
-         OPENCLAW_IMAGE=ghcr.io/openclaw/openclaw:2026.2.21\n\
-         ANTHROPIC_API_KEY={}\n",
-        config.gateway_token, config.anthropic_key
+        "# Nyx IronClaw Environment\n\
+         GATEWAY_AUTH_TOKEN={}\n\
+         ANTHROPIC_API_KEY={}\n\
+         LLM_BACKEND=anthropic\n\
+         DATABASE_BACKEND=libsql\n\
+         LIBSQL_PATH={}/.nyx/ironclaw.db\n\
+         GATEWAY_PORT={}\n",
+        config.gateway_token, config.anthropic_key, home.display(), gateway_port
     );
 
     if let Some(ref key) = config.openai_key {
@@ -884,6 +896,11 @@ pub fn write_docker_env(config: &SetupConfig) -> Result<(), String> {
         ));
     }
 
+    // WhatsApp phone
+    if let Some(ref phone) = config.whatsapp_phone {
+        content.push_str(&format!("\n# WhatsApp\nWHATSAPP_PHONE={}\n", phone));
+    }
+
     // Messaging env vars (with autonomy)
     let m = &config.messaging;
     content.push_str(&format!(
@@ -931,168 +948,35 @@ pub fn write_docker_env(config: &SetupConfig) -> Result<(), String> {
         caps.ollama_model.as_deref().unwrap_or(""),
     ));
 
+    // Ensure parent directory exists
+    if let Some(parent) = path.parent() {
+        let _ = fs::create_dir_all(parent);
+    }
     fs::write(&path, content)
-        .map_err(|e| format!("Failed to write docker.env: {}", e))?;
+        .map_err(|e| format!("Failed to write .env: {}", e))?;
 
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
         fs::set_permissions(&path, fs::Permissions::from_mode(0o600))
-            .map_err(|e| format!("Failed to set docker.env permissions: {}", e))?;
+            .map_err(|e| format!("Failed to set .env permissions: {}", e))?;
     }
 
     Ok(())
 }
 
 // ---------------------------------------------------------------------------
-// openclaw.json
+// config.toml (IronClaw daemon configuration)
 // ---------------------------------------------------------------------------
 
-/// Generate openclaw.json.
-pub fn write_openclaw_config(config: &SetupConfig) -> Result<(), String> {
+/// Generate config.toml for the IronClaw daemon.
+pub fn write_ironclaw_config(config: &SetupConfig) -> Result<(), String> {
     let home = home_dir();
-    let path = home.join(".openclaw/openclaw.json");
-
-    let has_perplexity = config.perplexity_key.is_some();
-    let has_telegram = config.telegram_token.is_some();
-    let has_slack = config.slack_token.is_some();
-    let has_openai = config.openai_key.is_some();
-    let has_venice = config.venice_key.is_some();
-    let has_nearai = config.nearai_key.is_some();
+    let path = home.join(".nyx/config.toml");
     let caps = &config.capabilities;
-    let default_provider = &caps.default_llm_provider;
 
-    // WhatsApp allowFrom: populate with user's phone if provided
-    let whatsapp_allow_from = match &config.whatsapp_phone {
-        Some(phone) => json!([phone]),
-        None => json!([]),
-    };
-
-    let mut channels = json!({
-        "whatsapp": {
-            "sendReadReceipts": true,
-            "dmPolicy": "allowlist",
-            "responsePrefix": "\u{1f310}",
-            "allowFrom": whatsapp_allow_from,
-            "groupPolicy": "disabled",
-            "textChunkLimit": 4000,
-            "mediaMaxMb": 50,
-            "debounceMs": 0
-        }
-    });
-
-    if has_telegram {
-        channels["telegram"] = json!({
-            "dmPolicy": "pairing",
-            "groupPolicy": "disabled",
-            "textChunkLimit": 4000,
-            "streamMode": "partial"
-        });
-    }
-
-    if has_slack {
-        channels["slack"] = json!({
-            "dmPolicy": "allowlist",
-            "groupPolicy": "disabled",
-            "textChunkLimit": 4000
-        });
-    }
-
-    let mut plugins = json!({
-        "whatsapp": { "enabled": true }
-    });
-    if has_telegram {
-        plugins["telegram"] = json!({ "enabled": true });
-    }
-    if has_slack {
-        plugins["slack"] = json!({ "enabled": true });
-    }
-
-    let mut tts = json!({});
-    if has_openai {
-        tts = json!({
-            "auto": "inbound",
-            "provider": "openai",
-            "openai": {
-                "model": "gpt-4o-mini-tts",
-                "voice": "alloy"
-            }
-        });
-    }
-
-    // Build dynamic lists based on capabilities
-    let mut safe_bins: Vec<&str> = vec!["ls", "find", "wc", "date", "openclaw", "curl", "touch"];
-    if caps.google_workspace {
-        safe_bins.push("gog");
-    }
-    if caps.defi_crypto {
-        safe_bins.push("/opt/near-intents-helper/run_near_intents.sh");
-    }
-
-    // ClawdTalk voice — add jq + shell scripts to safeBins when configured
-    if caps.communications {
-        let clawdtalk_config = home.join("openclaw/local-skills/clawdtalk/skill-config.json");
-        if clawdtalk_config.exists() {
-            safe_bins.push("jq");
-            safe_bins.push("/home/node/.openclaw/local-skills/clawdtalk/scripts/connect.sh");
-            safe_bins.push("/home/node/.openclaw/local-skills/clawdtalk/scripts/call.sh");
-            safe_bins.push("/home/node/.openclaw/local-skills/clawdtalk/scripts/sms.sh");
-            safe_bins.push("/home/node/.openclaw/local-skills/clawdtalk/scripts/missions.sh");
-        }
-    }
-
-    let mut allow_bundled: Vec<&str> = vec![];
-    if caps.google_workspace {
-        allow_bundled.push("gog");
-    }
-    if config.slack_token.is_some() {
-        allow_bundled.push("slack");
-    }
-
-    let mut skill_entries = serde_json::Map::new();
-    if caps.defi_crypto {
-        skill_entries.insert("near-intents".to_string(), json!({ "enabled": true }));
-    }
-    if caps.travel {
-        skill_entries.insert("travel".to_string(), json!({ "enabled": true }));
-    }
-    if caps.communications {
-        let clawdtalk_config = home.join("openclaw/local-skills/clawdtalk/skill-config.json");
-        if clawdtalk_config.exists() {
-            skill_entries.insert("clawdtalk-client".to_string(), json!({ "enabled": true }));
-        }
-    }
-
-    // Build LLM provider configuration
-    let mut providers = serde_json::Map::new();
-    providers.insert("anthropic".to_string(), json!({
-        "enabled": true,
-        "model": "claude-sonnet-4-20250514"
-    }));
-    if has_venice {
-        providers.insert("venice".to_string(), json!({
-            "enabled": true,
-            "baseUrl": "https://api.venice.ai/api/v1",
-            "model": "llama-3.3-70b"
-        }));
-    }
-    if has_openai {
-        providers.insert("openai".to_string(), json!({
-            "enabled": true,
-            "model": "gpt-4o"
-        }));
-    }
-    if has_nearai {
-        providers.insert("nearai".to_string(), json!({
-            "enabled": true,
-            "baseUrl": "https://cloud-api.near.ai/v1",
-            "model": "qwen3-30b-a3b"
-        }));
-    }
-
-    // Resolve the default model based on provider
-    let default_model = match default_provider.as_str() {
-        "anthropic" => "claude-sonnet-4-20250514",
+    // Resolve default model
+    let default_model = match caps.default_llm_provider.as_str() {
         "openai" => "gpt-4o",
         "venice" => "llama-3.3-70b",
         "nearai" => "qwen3-30b-a3b",
@@ -1100,112 +984,60 @@ pub fn write_openclaw_config(config: &SetupConfig) -> Result<(), String> {
         _ => "claude-sonnet-4-20250514",
     };
 
-    let config_json = json!({
-        "agents": {
-            "defaults": {
-                "workspace": "/home/node/.openclaw/workspace",
-                "model": default_model,
-                "maxConcurrent": 2,
-                "subagents": { "maxConcurrent": 4 },
-                "sandbox": { "mode": "off" }
-            },
-            "list": [{
-                "id": "default",
-                "default": true,
-                "workspace": "/home/node/.openclaw/workspace",
-                "identity": {
-                    "name": &config.agent_name,
-                    "theme": "private AI chief of staff",
-                    "emoji": "\u{1f3db}\u{fe0f}"
-                }
-            }]
-        },
-        "llm": {
-            "default": default_provider,
-            "providers": providers
-        },
-        "tools": {
-            "profile": "full",
-            "deny": [],
-            "web": {
-                "search": if has_perplexity {
-                    json!({ "enabled": true, "provider": "perplexity" })
-                } else {
-                    json!({ "enabled": true })
-                },
-                "fetch": {
-                    "enabled": true,
-                    "maxChars": 50000,
-                    "timeoutSeconds": 30
-                }
-            },
-            "media": { "audio": { "enabled": has_openai } },
-            "exec": {
-                "host": "gateway",
-                "ask": "off",
-                "security": "full",
-                "safeBins": safe_bins
-            }
-        },
-        "logging": {
-            "level": "info",
-            "consoleLevel": "info",
-            "redactSensitive": "tools",
-            "redactPatterns": [
-                "sk-ant-[A-Za-z0-9_\\-]+",
-                "sk-proj-[A-Za-z0-9_\\-]+",
-                "ed25519:[A-Za-z0-9]{40,}",
-                "AKIA[0-9A-Z]{16}",
-                "ghp_[A-Za-z0-9]{36}",
-                "[0-9a-f]{64}"
-            ]
-        },
-        "messages": {
-            "ackReactionScope": "group-mentions",
-            "tts": tts
-        },
-        "commands": { "native": "auto", "nativeSkills": "auto" },
-        "session": {},
-        "cron": { "enabled": true, "maxConcurrentRuns": 1 },
-        "channels": channels,
-        "gateway": {
-            "port": 18789,
-            "mode": "local",
-            "bind": "lan",
-            "auth": {
-                "mode": "token",
-                "token": &config.gateway_token
-            },
-            "http": {
-                "endpoints": {
-                    "chatCompletions": { "enabled": true }
-                }
-            },
-            "tailscale": { "mode": "off", "resetOnExit": false },
-            "controlUi": { "enabled": false }
-        },
-        "browser": {
-            "enabled": true,
-            "headless": true,
-            "noSandbox": true,
-            "defaultProfile": "openclaw",
-            "executablePath": "/home/node/.cache/ms-playwright/chromium-1208/chrome-linux/chrome"
-        },
-        "skills": {
-            "allowBundled": allow_bundled,
-            "load": {
-                "extraDirs": ["/home/node/.openclaw/local-skills"],
-                "watch": false
-            },
-            "entries": skill_entries
-        },
-        "plugins": { "entries": plugins }
-    });
+    // Determine gateway port (avoid collision with other IronClaw instances)
+    let gateway_port = crate::ironclaw::gateway_port();
 
-    let content = serde_json::to_string_pretty(&config_json)
-        .map_err(|e| format!("Failed to serialize config: {}", e))?;
+    let content = format!(
+        r#"# Nyx IronClaw Configuration
+# Generated by Nyx setup wizard
+
+onboard_completed = true
+selected_model = "{model}"
+
+[embeddings]
+enabled = false
+
+[tunnel]
+ts_funnel = false
+
+[channels]
+http_enabled = true
+http_host = "127.0.0.1"
+http_port = {port}
+signal_enabled = false
+wasm_channels = []
+wasm_channels_enabled = false
+
+[heartbeat]
+enabled = true
+interval_secs = 1800
+
+[agent]
+name = "{name}"
+max_parallel_jobs = 3
+job_timeout_secs = 3600
+stuck_threshold_secs = 300
+use_planning = true
+repair_check_interval_secs = 60
+max_repair_attempts = 3
+session_idle_timeout_secs = 604800
+max_tool_iterations = 50
+auto_approve_tools = true
+
+[safety]
+max_output_length = 100000
+injection_check_enabled = true
+"#,
+        model = default_model,
+        port = gateway_port,
+        name = config.agent_name,
+    );
+
+    if let Some(parent) = path.parent() {
+        let _ = fs::create_dir_all(parent);
+    }
     fs::write(&path, content)
-        .map_err(|e| format!("Failed to write openclaw.json: {}", e))?;
+        .map_err(|e| format!("Failed to write config.toml: {}", e))?;
 
     Ok(())
 }
@@ -1217,7 +1049,7 @@ pub fn write_openclaw_config(config: &SetupConfig) -> Result<(), String> {
 /// Write guardrails config from the provided GuardrailsConfig.
 pub fn write_guardrails(guardrails: &GuardrailsConfig) -> Result<(), String> {
     let home = home_dir();
-    let path = home.join(".openclaw/secrets/defi_guardrails.env");
+    let path = home.join(".nyx/secrets/defi_guardrails.env");
 
     let content = format!(
         "# Nyx DeFi Guardrails\n\
@@ -1259,7 +1091,7 @@ pub fn write_guardrails(guardrails: &GuardrailsConfig) -> Result<(), String> {
 /// Write cron jobs. Email schedules are user-configurable (timezone, hours).
 pub fn write_cron_jobs(config: &SetupConfig) -> Result<(), String> {
     let home = home_dir();
-    let path = home.join(".openclaw/cron/jobs.json");
+    let path = home.join(".nyx/cron/jobs.json");
 
     let e = &config.email_notifications;
     let caps = &config.capabilities;
@@ -1395,6 +1227,221 @@ pub fn write_cron_jobs(config: &SetupConfig) -> Result<(), String> {
 }
 
 // ---------------------------------------------------------------------------
+// Cron job types and CRUD
+// ---------------------------------------------------------------------------
+
+/// Represents the on-disk cron jobs file (version 2 format).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CronJobsFile {
+    pub version: u32,
+    pub jobs: Vec<CronJob>,
+}
+
+/// A single cron job entry. Uses `flatten` to preserve any extra fields
+/// written by the gateway (updatedAtMs, lastRunAtMs, etc.) during round-trip.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CronJob {
+    pub id: String,
+    pub agent_id: String,
+    pub name: String,
+    pub schedule: CronSchedule,
+    pub session_target: String,
+    pub payload: CronPayload,
+    #[serde(default = "default_cron_state")]
+    pub state: serde_json::Value,
+    pub enabled: bool,
+    #[serde(default = "default_cron_delivery")]
+    pub delivery: serde_json::Value,
+    /// Preserve extra fields written by the gateway (updatedAtMs, etc.)
+    #[serde(flatten)]
+    pub extra: serde_json::Map<String, serde_json::Value>,
+}
+
+fn default_cron_state() -> serde_json::Value {
+    json!({ "nextRunAtMs": null })
+}
+
+fn default_cron_delivery() -> serde_json::Value {
+    json!({ "mode": "none" })
+}
+
+/// Cron schedule — either a fixed interval or a cron expression.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", tag = "kind")]
+pub enum CronSchedule {
+    #[serde(rename = "every")]
+    Every {
+        #[serde(rename = "everyMs")]
+        every_ms: u64,
+        /// Anchor timestamp (set by gateway, preserved on round-trip)
+        #[serde(skip_serializing_if = "Option::is_none", rename = "anchorMs")]
+        anchor_ms: Option<u64>,
+    },
+    #[serde(rename = "cron")]
+    Cron {
+        expr: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        tz: Option<String>,
+    },
+}
+
+/// Cron payload — the action to execute when the job fires.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", tag = "kind")]
+pub enum CronPayload {
+    #[serde(rename = "agentTurn")]
+    AgentTurn { message: String },
+}
+
+/// Partial update for a cron job.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CronJobUpdate {
+    pub name: Option<String>,
+    pub schedule: Option<CronSchedule>,
+    pub message: Option<String>,
+    pub enabled: Option<bool>,
+}
+
+/// Built-in job IDs that cannot be deleted (only disabled).
+/// Covers both Nyx and Atlas naming conventions.
+const BUILTIN_JOB_IDS: &[&str] = &[
+    "nyx-heartbeat",
+    "atlas-defi-heartbeat",
+    "daily-defi-report",
+    "hourly-email-triage",
+    "daily-email-digest",
+    "proactive-intelligence",
+];
+
+fn cron_jobs_path() -> PathBuf {
+    home_dir().join(".nyx/cron/jobs.json")
+}
+
+/// Read all cron jobs from disk.
+pub fn read_cron_jobs() -> Result<CronJobsFile, String> {
+    let path = cron_jobs_path();
+    if !path.exists() {
+        return Ok(CronJobsFile {
+            version: 2,
+            jobs: vec![],
+        });
+    }
+    let content =
+        fs::read_to_string(&path).map_err(|e| format!("Failed to read cron jobs: {}", e))?;
+    serde_json::from_str(&content).map_err(|e| format!("Failed to parse cron jobs: {}", e))
+}
+
+/// Write the full cron jobs file back to disk.
+fn write_cron_jobs_file(file: &CronJobsFile) -> Result<(), String> {
+    let path = cron_jobs_path();
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)
+            .map_err(|e| format!("Failed to create cron directory: {}", e))?;
+    }
+    let content = serde_json::to_string_pretty(file)
+        .map_err(|e| format!("Failed to serialize cron jobs: {}", e))?;
+    fs::write(&path, content).map_err(|e| format!("Failed to write cron jobs: {}", e))
+}
+
+/// Create a new cron job and persist to disk.
+pub fn create_cron_job(
+    name: String,
+    schedule: CronSchedule,
+    message: String,
+    enabled: bool,
+) -> Result<CronJob, String> {
+    let mut file = read_cron_jobs()?;
+
+    // Generate a unique ID from the name
+    let base_id = name
+        .to_lowercase()
+        .chars()
+        .map(|c| if c.is_alphanumeric() { c } else { '-' })
+        .collect::<String>();
+    let id = if file.jobs.iter().any(|j| j.id == base_id) {
+        let ts = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_millis() % 100000)
+            .unwrap_or(0);
+        format!("{}-{}", base_id, ts)
+    } else {
+        base_id
+    };
+
+    // Reject duplicate IDs
+    if file.jobs.iter().any(|j| j.id == id) {
+        return Err(format!("A job with ID '{}' already exists", id));
+    }
+
+    let job = CronJob {
+        id,
+        agent_id: "default".to_string(),
+        name,
+        schedule,
+        session_target: "isolated".to_string(),
+        payload: CronPayload::AgentTurn { message },
+        state: default_cron_state(),
+        enabled,
+        delivery: default_cron_delivery(),
+        extra: serde_json::Map::new(),
+    };
+
+    file.jobs.push(job.clone());
+    write_cron_jobs_file(&file)?;
+    Ok(job)
+}
+
+/// Update an existing cron job by ID. Returns the updated job.
+pub fn update_cron_job(id: &str, updates: CronJobUpdate) -> Result<CronJob, String> {
+    let mut file = read_cron_jobs()?;
+
+    let job = file
+        .jobs
+        .iter_mut()
+        .find(|j| j.id == id)
+        .ok_or_else(|| format!("Job '{}' not found", id))?;
+
+    if let Some(name) = updates.name {
+        job.name = name;
+    }
+    if let Some(schedule) = updates.schedule {
+        job.schedule = schedule;
+    }
+    if let Some(message) = updates.message {
+        job.payload = CronPayload::AgentTurn { message };
+    }
+    if let Some(enabled) = updates.enabled {
+        job.enabled = enabled;
+    }
+
+    let updated = job.clone();
+    write_cron_jobs_file(&file)?;
+    Ok(updated)
+}
+
+/// Delete a cron job by ID. Built-in jobs cannot be deleted.
+pub fn delete_cron_job(id: &str) -> Result<(), String> {
+    if BUILTIN_JOB_IDS.contains(&id) {
+        return Err(format!(
+            "Cannot delete built-in job '{}'. Use update to disable it instead.",
+            id
+        ));
+    }
+
+    let mut file = read_cron_jobs()?;
+    let before = file.jobs.len();
+    file.jobs.retain(|j| j.id != id);
+
+    if file.jobs.len() == before {
+        return Err(format!("Job '{}' not found", id));
+    }
+
+    write_cron_jobs_file(&file)
+}
+
+// ---------------------------------------------------------------------------
 // Resource copying
 // ---------------------------------------------------------------------------
 
@@ -1402,27 +1449,27 @@ pub fn write_cron_jobs(config: &SetupConfig) -> Result<(), String> {
 pub fn copy_resources(resources_dir: &Path) -> Result<(), String> {
     let home = home_dir();
 
-    // Copy workspace files
+    // Copy workspace files (SOUL.md, IDENTITY.md, etc.)
     copy_dir_contents(
         &resources_dir.join("workspace"),
-        &home.join("openclaw/workspace"),
+        &home.join(".nyx/workspace"),
     )?;
 
     // Copy skills
     copy_dir_contents(
         &resources_dir.join("local-skills"),
-        &home.join("openclaw/local-skills"),
+        &home.join(".nyx/local-skills"),
     )?;
 
-    // Copy Python modules
+    // Copy Python modules (NEAR intents helper)
     copy_dir_contents(
         &resources_dir.join("near-intents-helper"),
-        &home.join("openclaw/near-intents-helper"),
+        &home.join(".nyx/near-intents-helper"),
     )?;
 
-    // Copy gog binaries — macOS native for host, Linux ARM64 for Docker container
+    // Copy gog binary (macOS native — IronClaw runs natively, no Docker)
     let gog_src = resources_dir.join("bin/gog");
-    let gog_dst = home.join("openclaw/bin/gog");
+    let gog_dst = home.join(".nyx/bin/gog");
     if gog_src.exists() {
         fs::copy(&gog_src, &gog_dst)
             .map_err(|e| format!("Failed to copy gog: {}", e))?;
@@ -1433,23 +1480,10 @@ pub fn copy_resources(resources_dir: &Path) -> Result<(), String> {
                 .map_err(|e| format!("Failed to set gog permissions: {}", e))?;
         }
     }
-    // Linux ARM64 gog binary — this is what gets mounted into the Docker container
-    let gog_linux_src = resources_dir.join("bin/gog-linux-arm64");
-    let gog_linux_dst = home.join("openclaw/bin/gog-linux-arm64");
-    if gog_linux_src.exists() {
-        fs::copy(&gog_linux_src, &gog_linux_dst)
-            .map_err(|e| format!("Failed to copy gog-linux-arm64: {}", e))?;
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            fs::set_permissions(&gog_linux_dst, fs::Permissions::from_mode(0o755))
-                .map_err(|e| format!("Failed to set gog-linux-arm64 permissions: {}", e))?;
-        }
-    }
 
-    // Copy jq binary (needed by ClawdTalk shell scripts inside Docker container)
+    // Copy jq binary
     let jq_src = resources_dir.join("bin/jq");
-    let jq_dst = home.join("openclaw/bin/jq");
+    let jq_dst = home.join(".nyx/bin/jq");
     if jq_src.exists() {
         fs::copy(&jq_src, &jq_dst)
             .map_err(|e| format!("Failed to copy jq: {}", e))?;
@@ -1458,42 +1492,6 @@ pub fn copy_resources(resources_dir: &Path) -> Result<(), String> {
             use std::os::unix::fs::PermissionsExt;
             fs::set_permissions(&jq_dst, fs::Permissions::from_mode(0o755))
                 .map_err(|e| format!("Failed to set jq permissions: {}", e))?;
-        }
-    }
-
-    // Copy OpenClaw runtime patches (e.g. billing error false-positive fix)
-    copy_dir_contents(
-        &resources_dir.join("patches"),
-        &home.join("openclaw/patches"),
-    )?;
-
-    // Copy docker-compose.yml
-    let compose_src = resources_dir.join("docker-compose.yml");
-    let compose_dst = home.join("openclaw/docker-compose.yml");
-    if compose_src.exists() {
-        fs::copy(&compose_src, &compose_dst)
-            .map_err(|e| format!("Failed to copy docker-compose.yml: {}", e))?;
-    }
-
-    // Copy squid.conf (egress proxy configuration)
-    let squid_src = resources_dir.join("squid.conf");
-    let squid_dst = home.join("openclaw/squid.conf");
-    if squid_src.exists() {
-        fs::copy(&squid_src, &squid_dst)
-            .map_err(|e| format!("Failed to copy squid.conf: {}", e))?;
-    }
-
-    // Copy start script (invoked by LaunchAgent at login)
-    let start_src = resources_dir.join("start-nyx.sh");
-    let start_dst = home.join("openclaw/start-nyx.sh");
-    if start_src.exists() {
-        fs::copy(&start_src, &start_dst)
-            .map_err(|e| format!("Failed to copy start-nyx.sh: {}", e))?;
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            fs::set_permissions(&start_dst, fs::Permissions::from_mode(0o755))
-                .map_err(|e| format!("Failed to set start-nyx.sh permissions: {}", e))?;
         }
     }
 

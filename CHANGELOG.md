@@ -3,6 +3,32 @@
 All notable changes to Nyx will be documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/); versions follow [Semantic Versioning](https://semver.org/).
 
+## [2.0.0] — 2026-03-04
+
+### Changed
+
+- **Backend migrated from OpenClaw (Docker) to IronClaw (native daemon)** — Nyx no longer requires Docker Desktop. The AI agent runs as a native IronClaw daemon managed via macOS LaunchAgent (`com.nyx.daemon`). All config stored under `~/.nyx/`.
+- **Gateway repointed** — HTTP gateway now communicates with IronClaw on port 3000 (auto-fallback to 3001 if port occupied).
+- **Session management** — Conversation history now managed client-side in local SQLite (`~/.nyx/sessions.db`) since IronClaw gateway is stateless.
+- **Config format** — OpenClaw JSON config (`openclaw.json`) replaced with IronClaw TOML (`config.toml`).
+- **Environment** — `OPENCLAW_GATEWAY_TOKEN` → `GATEWAY_AUTH_TOKEN`, credentials stored in `~/.nyx/.env`.
+- **Setup wizard** — No longer requires Docker Desktop prerequisite. Checks for IronClaw binary, auto-installs via `cargo install`, starts daemon.
+- **Settings page** — Docker container controls replaced with IronClaw daemon controls (start/stop/restart).
+- **MCP tools** — `nyx_docker_status` → `nyx_ironclaw_status`.
+- **Website** — Updated to reflect IronClaw architecture.
+
+### Fixed
+
+- **Port collision detection** — Auto-detects if another IronClaw instance occupies port 3000, falls back to 3001.
+- **Gateway port persistence** — `GATEWAY_PORT` now written to `.env` and preserved across settings updates.
+- **Daemon script portability** — Uses PATH resolution for ironclaw binary instead of hardcoded path.
+- **ClawdTalk setup order** — Voice calling now configured after directory creation (was silently failing).
+
+### Removed
+
+- Docker Desktop dependency (Docker rollback code kept in `docker.rs` for transition period).
+- Unused `gog-linux-arm64` binary copy (was only needed inside Docker container).
+
 ## [1.4.1] — 2026-02-23
 
 ### Fixed

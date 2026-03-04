@@ -294,7 +294,7 @@ pub fn init_db() -> Result<(), String> {
 
 fn gog_binary_path() -> String {
     let home = std::env::var("HOME").unwrap_or_default();
-    let local_path = format!("{}/openclaw/bin/gog", home);
+    let local_path = format!("{}/.nyx/bin/gog", home);
     if std::path::Path::new(&local_path).exists() {
         local_path
     } else {
@@ -732,7 +732,7 @@ const URGENCY_KEYWORDS: &[&str] = &[
 pub fn observe_messaging(hours: u32) -> Result<u32, String> {
     let home = std::env::var("HOME").unwrap_or_default();
     let sessions_path = std::path::PathBuf::from(&home)
-        .join(".openclaw/agents/default/sessions/sessions.json");
+        .join(".nyx/sessions.db");
 
     let sessions_content = std::fs::read_to_string(&sessions_path)
         .map_err(|e| format!("Failed to read sessions.json: {}", e))?;
@@ -749,7 +749,7 @@ pub fn observe_messaging(hours: u32) -> Result<u32, String> {
         .ok_or_else(|| "Main session not found in sessions.json".to_string())?;
 
     let session_file = std::path::PathBuf::from(&home)
-        .join(".openclaw/agents/default/sessions")
+        .join(".nyx")
         .join(format!("{}.jsonl", main_session_id));
 
     if !session_file.exists() {

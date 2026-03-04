@@ -3,7 +3,7 @@
   import { goto } from '$app/navigation';
 
   // Portfolio data — populated via Tauri IPC from portfolio.rs after setup
-  // Shows empty state until container is running and data is available
+  // Shows empty state until daemon is running and data is available
   let portfolio = $state<{totalValue: number, change24h: number, changeAmount: number} | null>(null);
   let positions = $state<{asset: string, protocol: string, type: string, amount: string, value: string, apy: string}[]>([]);
   let allocation = $state<{asset: string, pct: number, color: string}[]>([]);
@@ -123,7 +123,7 @@
         health = data.health ?? null;
       }
     } catch {
-      // Portfolio not available (container not running or no data yet)
+      // Portfolio not available (daemon not running or no data yet)
     }
   }
 
@@ -154,7 +154,7 @@
     <div class="flex flex-col items-center justify-center {intelligenceEnabled ? 'min-h-[300px]' : 'h-full min-h-[500px]'} text-center">
       <div class="font-display text-5xl font-light tracking-wider text-ivory/10 mb-6">Nyx</div>
       <p class="text-ivory-muted/40 text-sm mb-2">Your private AI chief of staff</p>
-      <p class="text-ivory-muted/30 text-xs max-w-sm">Built on <span class="text-gold/40">OpenClaw</span>. Complete setup to connect your communications, calendars and wallets. Seamless cross-chain transactions — including from shielded ZEC — powered by NEAR Intents. Your data stays local, your trail stays clean.</p>
+      <p class="text-ivory-muted/30 text-xs max-w-sm">Built on <span class="text-gold/40">IronClaw</span>. Complete setup to connect your communications, calendars and wallets. Seamless cross-chain transactions — including from shielded ZEC — powered by NEAR Intents. Your data stays local, your trail stays clean.</p>
       <a href="/setup" class="mt-8 px-6 py-2.5 border border-gold/40 text-gold/60 text-xs tracking-widest uppercase hover:border-gold hover:text-gold transition-colors duration-300 rounded">
         Run Setup
       </a>
