@@ -443,6 +443,11 @@ async fn install_ironclaw() -> Result<String, String> {
 }
 
 #[tauri::command]
+async fn upgrade_ironclaw() -> Result<String, String> {
+    ironclaw::upgrade_ironclaw().await
+}
+
+#[tauri::command]
 async fn ironclaw_start() -> Result<(), String> {
     ironclaw::start_daemon().await
 }
@@ -990,6 +995,7 @@ fn main() {
             check_ironclaw,
             check_ironclaw_detailed,
             install_ironclaw,
+            upgrade_ironclaw,
             ironclaw_start,
             ironclaw_stop,
             ironclaw_status,

@@ -264,7 +264,12 @@ pub async fn daemon_status() -> Result<String, String> {
     }
 }
 
-/// Install IronClaw via cargo install.
+/// Install IronClaw via cargo install from the NYX patched fork.
+///
+/// We install from our fork rather than crates.io to include critical fixes
+/// for orphaned tool_result messages and parallel tool_result merging
+/// (upstream PR: https://github.com/nearai/ironclaw/pull/635).
+/// Once the fixes land upstream we can revert to `cargo install ironclaw`.
 pub async fn install_ironclaw() -> Result<String, String> {
     if let Some(bin) = ironclaw_bin() {
         let version = Command::new(&bin)
@@ -278,7 +283,14 @@ pub async fn install_ironclaw() -> Result<String, String> {
     }
 
     let output = Command::new("cargo")
-        .args(["install", "ironclaw"])
+        .args([
+            "install",
+            "ironclaw",
+            "--git",
+            "https://github.com/NYX-privacy-ai/ironclaw",
+            "--features",
+            "libsql",
+        ])
         .output()
         .map_err(|e| format!("Failed to install IronClaw: {}", e))?;
 
@@ -287,5 +299,31 @@ pub async fn install_ironclaw() -> Result<String, String> {
     } else {
         let stderr = String::from_utf8_lossy(&output.stderr);
         Err(format!("Installation failed: {}", stderr))
+    }
+}
+
+/// Upgrade IronClaw to the latest patched version from the NYX fork.
+///
+/// Unlike `install_ironclaw()`, this always reinstalls even if the binary
+/// already exists — ensuring existing users pick up critical fixes.
+pub async fn upgrade_ironclaw() -> Result<String, String> {
+    let output = Command::new("cargo")
+        .args([
+            "install",
+            "ironclaw",
+            "--git",
+            "https://github.com/NYX-privacy-ai/ironclaw",
+            "--features",
+            "libsql",
+            "--force",
+        ])
+        .output()
+        .map_err(|e| format!("Failed to upgrade IronClaw: {}", e))?;
+
+    if output.status.success() {
+        Ok("IronClaw upgraded successfully".to_string())
+    } else {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        Err(format!("Upgrade failed: {}", stderr))
     }
 }
