@@ -327,3 +327,93 @@ pub async fn upgrade_ironclaw() -> Result<String, String> {
         Err(format!("Upgrade failed: {}", stderr))
     }
 }
+
+// ---------------------------------------------------------------------------
+// Auto-upgrade on app update
+// ---------------------------------------------------------------------------
+
+/// Version stamp file that records the Nyx app version that last installed
+/// or upgraded the IronClaw binary. When the app version changes (e.g. via
+/// Tauri auto-updater), this triggers an automatic IronClaw upgrade to ensure
+/// users always run the latest patched binary.
+const VERSION_STAMP_FILE: &str = ".ironclaw-app-version";
+
+/// Check if the IronClaw binary needs upgrading after a Nyx app update.
+///
+/// Compares the current Nyx app version (`CARGO_PKG_VERSION`) against a
+/// persisted stamp file in `~/.nyx/`. If they differ (or the stamp is
+/// missing but IronClaw is installed), runs `upgrade_ironclaw()` and
+/// restarts the daemon.
+///
+/// This runs in the background during app startup — it never blocks the
+/// UI or crashes the app on failure.
+pub async fn check_and_auto_upgrade() {
+    let nyx_dir = config_dir();
+    let stamp_path = nyx_dir.join(VERSION_STAMP_FILE);
+    let current_version = env!("CARGO_PKG_VERSION");
+
+    // Only act if setup has been completed (config dir exists with .env)
+    if !nyx_dir.join(".env").exists() {
+        return;
+    }
+
+    // Only act if IronClaw binary is installed
+    if ironclaw_bin().is_none() {
+        return;
+    }
+
+    // Read the persisted version stamp
+    let stamp_version = std::fs::read_to_string(&stamp_path)
+        .ok()
+        .map(|s| s.trim().to_string());
+
+    if stamp_version.as_deref() == Some(current_version) {
+        // Already up to date for this app version
+        return;
+    }
+
+    eprintln!(
+        "[nyx] App version changed ({} -> {}), upgrading IronClaw binary...",
+        stamp_version.as_deref().unwrap_or("none"),
+        current_version
+    );
+
+    // Stop daemon before upgrading the binary
+    if is_daemon_running_sync() {
+        if let Err(e) = stop_daemon().await {
+            eprintln!("[nyx] Warning: failed to stop daemon before upgrade: {}", e);
+            // Continue anyway — cargo install --force will overwrite
+        }
+        // Give daemon time to fully exit
+        tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+    }
+
+    // Run the upgrade
+    match upgrade_ironclaw().await {
+        Ok(msg) => {
+            eprintln!("[nyx] {}", msg);
+
+            // Write the stamp so we don't re-upgrade next launch
+            if let Err(e) = std::fs::write(&stamp_path, current_version) {
+                eprintln!("[nyx] Warning: failed to write version stamp: {}", e);
+            }
+
+            // Restart daemon with the new binary
+            if let Err(e) = start_daemon().await {
+                eprintln!("[nyx] Warning: failed to restart daemon after upgrade: {}", e);
+            } else {
+                eprintln!("[nyx] Daemon restarted with upgraded IronClaw binary");
+            }
+        }
+        Err(e) => {
+            // Don't crash the app — just log the failure.
+            // The old binary still works, so the user isn't blocked.
+            eprintln!("[nyx] IronClaw auto-upgrade failed (non-fatal): {}", e);
+
+            // Restart daemon with old binary if it was stopped
+            if !is_daemon_running_sync() {
+                let _ = start_daemon().await;
+            }
+        }
+    }
+}

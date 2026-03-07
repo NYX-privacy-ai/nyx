@@ -1071,6 +1071,13 @@ fn main() {
                 }
             });
 
+            // Auto-upgrade IronClaw binary if the Nyx app version changed
+            // (e.g. after auto-updater delivered a new Nyx release).
+            // Runs in background — never blocks startup or crashes on failure.
+            tauri::async_runtime::spawn(async {
+                ironclaw::check_and_auto_upgrade().await;
+            });
+
             // Start Activity Intelligence observer in background (only if enabled)
             let intel_handle = app.handle().clone();
             if config::read_current_config()
