@@ -1,0 +1,51 @@
+[package]
+name = "nyx"
+version = "2.0.2"
+edition = "2021"
+description = "Tauri v2 backend for Nyx — Rust commands, plugin integrations, and resource bundling"
+license = "AGPL-3.0-or-later"
+
+[lib]
+name = "nyx_lib"
+path = "src/lib.rs"
+
+[[bin]]
+name = "nyx"
+path = "src/main.rs"
+
+[[bin]]
+name = "nyx-mcp"
+path = "src/bin/nyx_mcp.rs"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon"] }
+tauri-plugin-shell = "2"
+tauri-plugin-updater = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["full"] }
+ed25519-dalek = { version = "2", features = ["rand_core"] }
+rand = "0.8"
+bs58 = "0.5"
+sha2 = "0.10"
+hex = "0.4"
+notify = "7"
+reqwest = { version = "0.12", features = ["json"] }
+dirs-next = "2"
+uuid = { version = "1", features = ["v4"] }
+
+# MCP server (Model Context Protocol)
+rmcp = { version = "0.15", features = ["server", "transport-io"] }
+schemars = "1"
+
+# PTY for embedded terminal
+portable-pty = "0.8"
+
+# SQLite for Activity Intelligence (bundled compiles from source — no system dep)
+rusqlite = { version = "0.34", features = ["bundled"] }
+
+# URL parsing for browser navigation
+url = "2"

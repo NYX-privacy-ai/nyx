@@ -1,0 +1,46 @@
+{
+  "version": "2026.2.21",
+  "agent": {
+    "name": "Nyx",
+    "model": "claude-sonnet-4-20250514"
+  },
+  "tools": {
+    "profile": "full",
+    "deny": [],
+    "web": {
+      "search": { "enabled": true },
+      "fetch": {
+        "enabled": true,
+        "maxChars": 50000,
+        "timeoutSeconds": 30
+      }
+    },
+    "exec": {
+      "host": "gateway",
+      "ask": "off",
+      "security": "full",
+      "safeBins": ["gog", "ls", "find", "wc", "date", "openclaw", "curl", "touch"]
+    }
+  },
+  "sandbox": {
+    "mode": "off"
+  },
+  "browser": {
+    "enabled": true,
+    "headless": true,
+    "noSandbox": true,
+    "defaultProfile": "openclaw",
+    "executablePath": "/home/node/.cache/ms-playwright/chromium-1208/chrome-linux/chrome"
+  },
+  "cron": {
+    "enabled": true,
+    "maxConcurrentRuns": 1
+  },
+  "skills": {
+    "allowLocal": true
+  },
+  "plugins": {
+    "entries": {}
+  },
+  "channels": {}
+}

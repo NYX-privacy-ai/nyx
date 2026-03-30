@@ -1,0 +1,59 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Nyx Design System */
+
+@layer base {
+  body {
+    @apply bg-black text-ivory font-body antialiased;
+    font-weight: 300;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    /* Prevent text selection on drag (Tauri window) */
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  /* Allow text selection in specific areas */
+  .selectable {
+    -webkit-user-select: text;
+    user-select: text;
+  }
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #303036;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #404046;
+}
+
+/* Gold shimmer animation for skeleton loading */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    theme('colors.surface') 25%,
+    theme('colors.surface-raised') 50%,
+    theme('colors.surface') 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 2s ease-in-out infinite;
+  border-radius: 4px;
+}
