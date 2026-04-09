@@ -33,6 +33,14 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
+      - name: Build nyx-mcp binary (Apple Silicon)
+        # Tauri externalBin requires a pre-built binary at
+        # src-tauri/binaries/nyx-mcp-aarch64-apple-darwin.
+        # Build it natively here so it is always current.
+        run: |
+          cargo build --release --bin nyx-mcp --target aarch64-apple-darwin --manifest-path src-tauri/Cargo.toml
+          cp src-tauri/target/aarch64-apple-darwin/release/nyx-mcp src-tauri/binaries/nyx-mcp-aarch64-apple-darwin
+
       - name: Build Tauri app (Apple Silicon)
         uses: tauri-apps/tauri-action@v0
         env:
@@ -51,8 +59,10 @@ jobs:
       - name: Upload stable-named DMG (website download link)
         # The website links to /releases/latest/download/Nyx_aarch64.dmg (no version
         # in the name) so the download URL never changes across releases.
+        # When built with --target, Tauri outputs to target/<triple>/release/bundle/.
         run: |
-          DMG=$(ls src-tauri/target/release/bundle/dmg/Nyx_*_aarch64.dmg 2>/dev/null | head -1)
+          DMG=$(ls src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/Nyx_*_aarch64.dmg 2>/dev/null | head -1)
+          [[ -z "$DMG" ]] && DMG=$(ls src-tauri/target/release/bundle/dmg/Nyx_*_aarch64.dmg 2>/dev/null | head -1)
           if [[ -n "$DMG" ]]; then
             cp "$DMG" Nyx_aarch64.dmg
             gh release upload "${{ github.ref_name }}" Nyx_aarch64.dmg --clobber
@@ -84,6 +94,14 @@ jobs:
 
       - name: Install frontend dependencies
         run: npm ci
+
+      - name: Build nyx-mcp binary (Intel)
+        # Tauri externalBin requires a pre-built binary at
+        # src-tauri/binaries/nyx-mcp-x86_64-apple-darwin.
+        # The committed binary is aarch64-only; build natively for Intel here.
+        run: |
+          cargo build --release --bin nyx-mcp --target x86_64-apple-darwin --manifest-path src-tauri/Cargo.toml
+          cp src-tauri/target/x86_64-apple-darwin/release/nyx-mcp src-tauri/binaries/nyx-mcp-x86_64-apple-darwin
 
       - name: Build Tauri app (Intel)
         uses: tauri-apps/tauri-action@v0
