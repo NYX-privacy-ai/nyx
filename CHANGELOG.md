@@ -3,6 +3,21 @@
 All notable changes to Nyx will be documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/); versions follow [Semantic Versioning](https://semver.org/).
 
+## [2.0.4] — 2026-04-09
+
+### Fixed
+
+- **Conversation history unbounded** — chat sessions were sending the full message history on every request with no limit, causing context poisoning in long sessions. Now capped at 40 messages (20 turns).
+- **DeFi tools path mismatch** — HEARTBEAT.md, SKILL.md, and cron job prompts referenced `/opt/near-intents-helper/` which was never created during setup. All references corrected to `~/.nyx/near-intents-helper/`.
+- **Dual heartbeat** — IronClaw's native heartbeat (every 30 min) overlapped with the dedicated cron heartbeat job (every 4h). Native heartbeat now disabled; cron jobs own all periodic work with proper session isolation.
+- **Python venv bootstrap** — run_near_intents.sh hardcoded a Docker-era container venv path that never exists on native macOS. Now auto-creates the local venv on first invocation if missing.
+- **Email config always defaulting** — `read_email_config` called `.as_array()` on the top-level JSON object instead of the nested `jobs` array; also used wrong key names (`"cron"` / `"timezone"` vs `"expr"` / `"tz"`). Settings page now correctly reads back configured email schedule.
+- **Stale default model** — Anthropic default updated from `claude-sonnet-4-20250514` to `claude-sonnet-4-6`.
+
+### Changed
+
+- **Release workflow** — GitHub Actions now uploads a stable `Nyx_aarch64.dmg` asset (no version suffix) alongside the versioned artifact, so the website download link never needs updating.
+
 ## [2.0.0] — 2026-03-04
 
 ### Changed
