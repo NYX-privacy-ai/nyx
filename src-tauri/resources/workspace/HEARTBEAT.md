@@ -12,7 +12,7 @@
 - Remind user of imminent meetings (< 30 min away)
 
 ### DeFi Heartbeat
-- Run `/opt/near-intents-helper/run_near_intents.sh heartbeat --risk medium`
+- Run `~/.nyx/near-intents-helper/run_near_intents.sh heartbeat --risk medium`
 - Only alert if actions taken or errors occurred
 
 ### Portfolio Check

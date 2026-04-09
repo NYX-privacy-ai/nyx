@@ -177,9 +177,12 @@ pub async fn send_message_to_session(message: String, session_key: String) -> Re
             rusqlite::params![&session_key],
         ).map_err(|e| format!("DB error: {}", e))?;
 
-        // Load history
+        // Load history — cap at 40 messages (20 pairs) to prevent context poisoning
         let mut stmt = db.prepare(
-            "SELECT role, content FROM messages WHERE session_id = ?1 ORDER BY created_at ASC"
+            "SELECT role, content FROM (
+                SELECT role, content, created_at FROM messages WHERE session_id = ?1
+                ORDER BY created_at DESC LIMIT 40
+            ) ORDER BY created_at ASC"
         ).map_err(|e| format!("DB error: {}", e))?;
 
         let history: Vec<serde_json::Value> = stmt

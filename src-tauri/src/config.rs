@@ -502,17 +502,19 @@ fn read_email_config(home: &Path) -> EmailNotificationsConfig {
 
     let mut config = EmailNotificationsConfig::default();
 
-    if let Some(arr) = jobs.as_array() {
+    if let Some(arr) = jobs.get("jobs").and_then(|v| v.as_array()) {
         for job in arr {
             let id = job.get("id").and_then(|v| v.as_str()).unwrap_or("");
             match id {
                 "daily-email-digest" => {
                     if let Some(sched) = job.get("schedule") {
-                        if let Some(tz) = sched.get("timezone").and_then(|v| v.as_str()) {
+                        // Key is "tz" in the v2 format (not "timezone")
+                        if let Some(tz) = sched.get("tz").and_then(|v| v.as_str()) {
                             config.timezone = tz.to_string();
                         }
+                        // Key is "expr" in the v2 format (not "cron")
                         // Parse cron: "30 8 * * *" -> minute=30, hour=8
-                        if let Some(cron_str) = sched.get("cron").and_then(|v| v.as_str()) {
+                        if let Some(cron_str) = sched.get("expr").and_then(|v| v.as_str()) {
                             let parts: Vec<&str> = cron_str.split_whitespace().collect();
                             if parts.len() >= 2 {
                                 config.digest_minute = parts[0].parse().unwrap_or(30);
@@ -524,7 +526,8 @@ fn read_email_config(home: &Path) -> EmailNotificationsConfig {
                 }
                 "hourly-email-triage" => {
                     if let Some(sched) = job.get("schedule") {
-                        if let Some(cron_str) = sched.get("cron").and_then(|v| v.as_str()) {
+                        // Key is "expr" in the v2 format (not "cron")
+                        if let Some(cron_str) = sched.get("expr").and_then(|v| v.as_str()) {
                             // Parse "0 8-22 * * *" -> start=8, end=22
                             let parts: Vec<&str> = cron_str.split_whitespace().collect();
                             if parts.len() >= 2 {
@@ -981,7 +984,7 @@ pub fn write_ironclaw_config(config: &SetupConfig) -> Result<(), String> {
         "venice" => "llama-3.3-70b",
         "nearai" => "qwen3-30b-a3b",
         "ollama" => caps.ollama_model.as_deref().unwrap_or("qwen3:4b"),
-        _ => "claude-sonnet-4-20250514",
+        _ => "claude-sonnet-4-6",
     };
 
     // Determine gateway port (avoid collision with other IronClaw instances)
@@ -1009,7 +1012,7 @@ wasm_channels = []
 wasm_channels_enabled = false
 
 [heartbeat]
-enabled = true
+enabled = false
 interval_secs = 1800
 
 [agent]
@@ -1141,7 +1144,7 @@ pub fn write_cron_jobs(config: &SetupConfig) -> Result<(), String> {
                     "kind": "agentTurn",
                     "message": format!(
                         "Run the {} DeFi heartbeat check. Use the near-intents skill to execute: \
-                        /opt/near-intents-helper/run_near_intents.sh heartbeat --risk medium\n\n\
+                        ~/.nyx/near-intents-helper/run_near_intents.sh heartbeat --risk medium\n\n\
                         If any actions were taken or errors occurred, send me a brief summary on {}. \
                         If everything is stable and no actions were needed, stay silent (don't message me).",
                         &config.agent_name, delivery_channel
@@ -1161,7 +1164,7 @@ pub fn write_cron_jobs(config: &SetupConfig) -> Result<(), String> {
                     "kind": "agentTurn",
                     "message": format!(
                         "Generate and send the daily DeFi report. Use the near-intents skill to execute: \
-                        /opt/near-intents-helper/run_near_intents.sh daily-report\n\n\
+                        ~/.nyx/near-intents-helper/run_near_intents.sh daily-report\n\n\
                         Format the results into a clear, concise message with:\n\
                         - Portfolio value and daily P&L\n\
                         - Any active positions (staking, lending)\n\

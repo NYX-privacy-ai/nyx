@@ -14,7 +14,7 @@ This skill provides four sets of capabilities:
 3. **NEAR Intents** — NEAR-to-NEAR token swaps via the Solver Relay
 4. **Nyx DeFi** — Autonomous portfolio management (staking, lending, rebalancing)
 
-All commands go through the wrapper script at `/opt/near-intents-helper/run_near_intents.sh`.
+All commands go through the wrapper script at `~/.nyx/near-intents-helper/run_near_intents.sh`.
 
 ---
 
@@ -45,12 +45,12 @@ Skip ZEC routing only if:
 
 ```bash
 # Quote: any token to ZEC
-/opt/near-intents-helper/run_near_intents.sh cross-quote \
+~/.nyx/near-intents-helper/run_near_intents.sh cross-quote \
   --from-chain eth --from-token ETH --from-amount 0.1 \
   --to-chain zec --to-token ZEC
 
 # Quote: ZEC to any token
-/opt/near-intents-helper/run_near_intents.sh cross-quote \
+~/.nyx/near-intents-helper/run_near_intents.sh cross-quote \
   --from-chain zec --from-token ZEC --from-amount 10.0 \
   --to-chain eth --to-token USDC
 ```
@@ -58,7 +58,7 @@ Skip ZEC routing only if:
 ### ZEC Shielding Status
 
 ```bash
-/opt/near-intents-helper/run_near_intents.sh zec-status
+~/.nyx/near-intents-helper/run_near_intents.sh zec-status
 ```
 
 Returns:
@@ -91,7 +91,7 @@ The 1Click API at `https://1click.chaindefuser.com/v0` enables seamless cross-ch
 ### Cross-Chain Quote
 
 ```bash
-/opt/near-intents-helper/run_near_intents.sh cross-quote \
+~/.nyx/near-intents-helper/run_near_intents.sh cross-quote \
   --from-chain eth --from-token ETH --from-amount 0.1 \
   --to-chain near --to-token NEAR
 ```
@@ -99,7 +99,7 @@ The 1Click API at `https://1click.chaindefuser.com/v0` enables seamless cross-ch
 ### Cross-Chain Swap (REQUIRES CONFIRMATION)
 
 ```bash
-/opt/near-intents-helper/run_near_intents.sh cross-swap \
+~/.nyx/near-intents-helper/run_near_intents.sh cross-swap \
   --quote-hash HASH_FROM_QUOTE \
   --confirm YES
 ```
@@ -109,7 +109,7 @@ The 1Click API at `https://1click.chaindefuser.com/v0` enables seamless cross-ch
 ### Cross-Chain Status
 
 ```bash
-/opt/near-intents-helper/run_near_intents.sh cross-status --id SWAP_ID
+~/.nyx/near-intents-helper/run_near_intents.sh cross-status --id SWAP_ID
 ```
 
 ---
@@ -119,7 +119,7 @@ The 1Click API at `https://1click.chaindefuser.com/v0` enables seamless cross-ch
 ### 1. Quote — Get swap price quotes
 
 ```bash
-/opt/near-intents-helper/run_near_intents.sh quote --in NEAR --out USDC --amount 1.0
+~/.nyx/near-intents-helper/run_near_intents.sh quote --in NEAR --out USDC --amount 1.0
 ```
 
 Parameters:
@@ -132,7 +132,7 @@ Returns JSON with available quotes sorted by best price.
 ### 2. Publish — Submit a signed intent (REQUIRES CONFIRMATION)
 
 ```bash
-/opt/near-intents-helper/run_near_intents.sh publish \
+~/.nyx/near-intents-helper/run_near_intents.sh publish \
   --quote-hash HASH_FROM_QUOTE \
   --in NEAR --out USDC \
   --amount-in 1.0 --amount-out 3.50 \
@@ -145,7 +145,7 @@ The `--confirm YES` flag is mandatory. Never auto-confirm.
 ### 3. Status — Check intent execution status
 
 ```bash
-/opt/near-intents-helper/run_near_intents.sh status --intent-hash HASH
+~/.nyx/near-intents-helper/run_near_intents.sh status --intent-hash HASH
 ```
 
 ---
@@ -155,7 +155,7 @@ The `--confirm YES` flag is mandatory. Never auto-confirm.
 ### 4. Balance — Show all token balances
 
 ```bash
-/opt/near-intents-helper/run_near_intents.sh balance
+~/.nyx/near-intents-helper/run_near_intents.sh balance
 ```
 
 Returns all token balances (NEAR, wNEAR, stNEAR, USDC, ZEC, etc.) with USD valuations.
@@ -164,7 +164,7 @@ Flags any unshielded ZEC balance as a privacy concern.
 ### 5. Positions — Show active DeFi positions
 
 ```bash
-/opt/near-intents-helper/run_near_intents.sh positions
+~/.nyx/near-intents-helper/run_near_intents.sh positions
 ```
 
 Returns Meta Pool staking positions, Burrow lending/borrowing positions, and health factors.
@@ -172,7 +172,7 @@ Returns Meta Pool staking positions, Burrow lending/borrowing positions, and hea
 ### 6. Report — Full portfolio + yield report
 
 ```bash
-/opt/near-intents-helper/run_near_intents.sh report --risk medium
+~/.nyx/near-intents-helper/run_near_intents.sh report --risk medium
 ```
 
 Parameters:
@@ -183,7 +183,7 @@ Returns portfolio summary, yield opportunities across protocols, and allocation 
 ### 7. Rebalance — Execute autonomous rebalancing
 
 ```bash
-/opt/near-intents-helper/run_near_intents.sh rebalance --confirm AUTONOMOUS --risk medium
+~/.nyx/near-intents-helper/run_near_intents.sh rebalance --confirm AUTONOMOUS --risk medium
 ```
 
 Parameters:
@@ -210,7 +210,7 @@ Note: Autonomous preset effectively disables all trading limits.
 ### 8. Burrow Loop — Leveraged staking via Burrow
 
 ```bash
-/opt/near-intents-helper/run_near_intents.sh burrow-loop \
+~/.nyx/near-intents-helper/run_near_intents.sh burrow-loop \
   --amount 410 \
   --target-leverage 3.0 \
   --min-health-factor 1.5 \
@@ -243,7 +243,7 @@ Safety:
 ### 9. Emergency Exit — Unwind all positions to NEAR
 
 ```bash
-/opt/near-intents-helper/run_near_intents.sh emergency-exit --confirm YES
+~/.nyx/near-intents-helper/run_near_intents.sh emergency-exit --confirm YES
 ```
 
 **CRITICAL**: Only run this when the user explicitly requests it, or when guardrails trigger an emergency.
@@ -265,7 +265,7 @@ They can also be run manually.
 ### 10. Heartbeat — Periodic strategy check (cron: every 4h)
 
 ```bash
-/opt/near-intents-helper/run_near_intents.sh heartbeat --risk medium
+~/.nyx/near-intents-helper/run_near_intents.sh heartbeat --risk medium
 ```
 
 Parameters:
@@ -284,7 +284,7 @@ All actions are logged and pass through guardrails.
 ### 11. Daily Report — P&L summary (cron: 9am UK)
 
 ```bash
-/opt/near-intents-helper/run_near_intents.sh daily-report
+~/.nyx/near-intents-helper/run_near_intents.sh daily-report
 ```
 
 Runs automatically at 9am UK time. Returns:
@@ -308,7 +308,7 @@ This limits blast radius if any key is compromised.
 ### 12. Deploy Keys — Create function-call keys for all DeFi contracts
 
 ```bash
-/opt/near-intents-helper/run_near_intents.sh deploy-keys --confirm YES
+~/.nyx/near-intents-helper/run_near_intents.sh deploy-keys --confirm YES
 ```
 
 **CRITICAL**: Only run when the user explicitly requests it.
@@ -326,7 +326,7 @@ Keys are stored in `~/.openclaw/secrets/function_call_keys.json` (chmod 600).
 ### 13. List Keys — Show all access keys on the account
 
 ```bash
-/opt/near-intents-helper/run_near_intents.sh list-keys
+~/.nyx/near-intents-helper/run_near_intents.sh list-keys
 ```
 
 Lists all access keys (full-access and function-call) with their permissions.

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Wrapper script for NEAR Intents + Nyx DeFi helper.
-# This is the ONLY command OpenClaw is allowed to invoke.
+# This is the ONLY command IronClaw is allowed to invoke.
 # Strict argument parsing — no arbitrary shell injection.
 # All stdout is piped through leak_detector to redact secrets.
 set -euo pipefail
@@ -9,19 +9,20 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 INTENTS_HELPER="${SCRIPT_DIR}/near_intents.py"
 STRATEGY_HELPER="${SCRIPT_DIR}/strategy.py"
 LEAK_DETECTOR="${SCRIPT_DIR}/leak_detector.py"
+REQUIREMENTS="${SCRIPT_DIR}/requirements.txt"
 
-# Find Python venv — check container venv first, then local venv
-CONTAINER_VENV="/home/node/.openclaw/defi-state/.venv"
+# Local venv — created on first run if missing
 LOCAL_VENV="${SCRIPT_DIR}/.venv"
 
-if [[ -f "${CONTAINER_VENV}/bin/python3" ]]; then
-    PYTHON="${CONTAINER_VENV}/bin/python3"
-elif [[ -f "${LOCAL_VENV}/bin/python3" ]]; then
-    PYTHON="${LOCAL_VENV}/bin/python3"
-else
-    echo '{"status":"error","message":"Python venv not found. Run setup first."}' >&2
-    exit 1
+if [[ ! -f "${LOCAL_VENV}/bin/python3" ]]; then
+    echo '{"status":"info","message":"Bootstrap: creating Python venv..."}' >&2
+    python3 -m venv "${LOCAL_VENV}"
+    if [[ -f "${REQUIREMENTS}" ]]; then
+        "${LOCAL_VENV}/bin/pip" install --quiet -r "${REQUIREMENTS}"
+    fi
 fi
+
+PYTHON="${LOCAL_VENV}/bin/python3"
 
 # Set PYTHONPATH so modules can find each other
 export PYTHONPATH="${SCRIPT_DIR}:${PYTHONPATH:-}"
