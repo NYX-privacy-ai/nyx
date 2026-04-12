@@ -1,6 +1,6 @@
 [package]
 name = "nyx"
-version = "2.0.4"
+version = "2.0.5"
 edition = "2021"
 description = "Tauri v2 backend for Nyx — Rust commands, plugin integrations, and resource bundling"
 license = "AGPL-3.0-or-later"
@@ -49,3 +49,6 @@ rusqlite = { version = "0.34", features = ["bundled"] }
 
 # URL parsing for browser navigation
 url = "2"
+
+# Timestamps for tasks/knowledge modules
+chrono = { version = "0.4", features = ["serde"] }

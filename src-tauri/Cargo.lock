@@ -2359,9 +2359,10 @@ dependencies = [
 
 [[package]]
 name = "nyx"
-version = "2.0.4"
+version = "2.0.5"
 dependencies = [
  "bs58",
+ "chrono",
  "dirs-next",
  "ed25519-dalek",
  "hex",

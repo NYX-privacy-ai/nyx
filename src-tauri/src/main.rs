@@ -15,10 +15,12 @@ mod clawdtalk;
 mod claudecode;
 mod google;
 mod intelligence;
+mod knowledge;
 mod ollama;
 mod portfolio;
 mod pty;
 mod setup;
+mod tasks;
 
 // ---------------------------------------------------------------------------
 // Docker commands
@@ -971,6 +973,74 @@ fn delete_scheduled_task(id: String) -> Result<(), String> {
 }
 
 // ---------------------------------------------------------------------------
+// Tasks
+// ---------------------------------------------------------------------------
+
+#[tauri::command]
+fn list_tasks(status: Option<String>, category: Option<String>) -> Result<Vec<tasks::Task>, String> {
+    tasks::list_tasks(status.as_deref(), category.as_deref())
+}
+
+#[tauri::command]
+fn create_task(input: tasks::CreateTaskInput) -> Result<tasks::Task, String> {
+    tasks::create_task(input)
+}
+
+#[tauri::command]
+fn update_task(id: i64, input: tasks::UpdateTaskInput) -> Result<tasks::Task, String> {
+    tasks::update_task(id, input)
+}
+
+#[tauri::command]
+fn delete_task(id: i64) -> Result<(), String> {
+    tasks::delete_task(id)
+}
+
+#[tauri::command]
+fn get_task_stats() -> Result<tasks::TaskStats, String> {
+    tasks::get_task_stats()
+}
+
+// ---------------------------------------------------------------------------
+// Knowledge (Wiki)
+// ---------------------------------------------------------------------------
+
+#[tauri::command]
+fn list_knowledge(category: Option<String>, limit: Option<u32>) -> Result<Vec<knowledge::KnowledgeEntry>, String> {
+    knowledge::list_entries(category.as_deref(), limit)
+}
+
+#[tauri::command]
+fn search_knowledge(query: String) -> Result<Vec<knowledge::KnowledgeEntry>, String> {
+    knowledge::search_entries(&query)
+}
+
+#[tauri::command]
+fn get_knowledge_entry(id: i64) -> Result<knowledge::KnowledgeEntry, String> {
+    knowledge::get_entry(id)
+}
+
+#[tauri::command]
+fn create_knowledge_entry(input: knowledge::CreateKnowledgeInput) -> Result<knowledge::KnowledgeEntry, String> {
+    knowledge::create_entry(input)
+}
+
+#[tauri::command]
+fn update_knowledge_entry(id: i64, input: knowledge::UpdateKnowledgeInput) -> Result<knowledge::KnowledgeEntry, String> {
+    knowledge::update_entry(id, input)
+}
+
+#[tauri::command]
+fn delete_knowledge_entry(id: i64) -> Result<(), String> {
+    knowledge::delete_entry(id)
+}
+
+#[tauri::command]
+fn get_knowledge_stats() -> Result<knowledge::KnowledgeStats, String> {
+    knowledge::get_knowledge_stats()
+}
+
+// ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 
@@ -1091,6 +1161,20 @@ fn main() {
             get_autonomy_settings,
             set_autonomy_level,
             clear_intelligence_data,
+            // Tasks
+            list_tasks,
+            create_task,
+            update_task,
+            delete_task,
+            get_task_stats,
+            // Knowledge (Wiki)
+            list_knowledge,
+            search_knowledge,
+            get_knowledge_entry,
+            create_knowledge_entry,
+            update_knowledge_entry,
+            delete_knowledge_entry,
+            get_knowledge_stats,
             // Web Browser
             browser_open,
             browser_close,

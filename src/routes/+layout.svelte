@@ -23,6 +23,8 @@
     { href: '/code', icon: 'code', label: 'Code' },
     { href: '/verify', icon: 'verify', label: 'Verify' },
     { href: '/privacy', icon: 'privacy', label: 'Privacy' },
+    { href: '/tasks', icon: 'tasks', label: 'Tasks' },
+    { href: '/wiki', icon: 'wiki', label: 'Wiki' },
     { href: '/schedules', icon: 'schedules', label: 'Schedules' }
   ];
 
@@ -153,6 +155,14 @@
           {:else if item.icon === 'privacy'}
             <svg class="w-5 h-5 transition-colors duration-300" class:text-gold={isActive(item.href, $page.url.pathname)} class:text-ivory-muted={!isActive(item.href, $page.url.pathname)} fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
               <path d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+            </svg>
+          {:else if item.icon === 'tasks'}
+            <svg class="w-5 h-5 transition-colors duration-300" class:text-gold={isActive(item.href, $page.url.pathname)} class:text-ivory-muted={!isActive(item.href, $page.url.pathname)} fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+              <path d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          {:else if item.icon === 'wiki'}
+            <svg class="w-5 h-5 transition-colors duration-300" class:text-gold={isActive(item.href, $page.url.pathname)} class:text-ivory-muted={!isActive(item.href, $page.url.pathname)} fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+              <path d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
             </svg>
           {:else if item.icon === 'schedules'}
             <svg class="w-5 h-5 transition-colors duration-300" class:text-gold={isActive(item.href, $page.url.pathname)} class:text-ivory-muted={!isActive(item.href, $page.url.pathname)} fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">

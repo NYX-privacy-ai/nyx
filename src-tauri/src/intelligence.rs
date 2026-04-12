@@ -171,6 +171,11 @@ fn open_db() -> Result<Connection, String> {
     Connection::open(&path).map_err(|e| format!("Failed to open intelligence.db: {}", e))
 }
 
+/// Public DB accessor for sibling modules (tasks, knowledge)
+pub fn open_db_pub() -> Result<Connection, String> {
+    open_db()
+}
+
 // ---------------------------------------------------------------------------
 // Schema initialisation + migrations
 // ---------------------------------------------------------------------------
@@ -284,6 +289,10 @@ pub fn init_db() -> Result<(), String> {
         ",
     )
     .map_err(|e| format!("Failed to initialise intelligence schema: {}", e))?;
+
+    // Initialise sibling module tables (tasks, knowledge)
+    crate::tasks::init_tables(&conn)?;
+    crate::knowledge::init_tables(&conn)?;
 
     Ok(())
 }
@@ -1731,6 +1740,62 @@ pub fn detect_meeting_patterns() -> Result<Vec<Suggestion>, String> {
     Ok(suggestions)
 }
 
+/// Detect topics that appear frequently in conversations but have no wiki entry.
+pub fn detect_knowledge_opportunities() -> Result<Vec<Suggestion>, String> {
+    let conn = open_db()?;
+    let now = now_iso();
+    let seven_days = days_ago(7);
+
+    // Find frequent subjects from recent email threads that don't match existing wiki titles
+    let mut stmt = conn
+        .prepare(
+            "SELECT subject, COUNT(*) as thread_count
+             FROM emails
+             WHERE date >= ?1
+             GROUP BY subject
+             HAVING thread_count >= 3
+             AND subject NOT IN (SELECT title FROM knowledge)
+             ORDER BY thread_count DESC
+             LIMIT 5",
+        )
+        .map_err(|e| format!("Query failed: {}", e))?;
+
+    let rows = stmt
+        .query_map(params![seven_days], |row| {
+            let subject: String = row.get(0)?;
+            let count: i64 = row.get(1)?;
+
+            Ok(Suggestion {
+                id: 0,
+                suggestion_type: "learn_topic".to_string(),
+                title: format!("Create wiki entry: {}", subject),
+                description: format!(
+                    "\"{}\" has appeared in {} email threads this week. Create a knowledge entry to track this topic?",
+                    subject, count
+                ),
+                contact_email: None,
+                confidence: 0.5,
+                context: Some(serde_json::json!({
+                    "subject": subject,
+                    "email_count_7d": count,
+                })
+                .to_string()),
+                status: "pending".to_string(),
+                created_at: now.clone(),
+                acted_at: None,
+                expires_at: Some(days_ahead(7)),
+            })
+        })
+        .map_err(|e| format!("Query failed: {}", e))?;
+
+    let mut suggestions = Vec::new();
+    for row in rows {
+        suggestions.push(row.map_err(|e| format!("Row error: {}", e))?);
+    }
+
+    Ok(suggestions)
+}
+
 /// Master function: run all detectors, deduplicate, insert into suggestions table.
 pub fn generate_suggestions() -> Result<u32, String> {
     let mut all: Vec<Suggestion> = Vec::new();
@@ -1746,6 +1811,9 @@ pub fn generate_suggestions() -> Result<u32, String> {
         all.append(&mut s);
     }
     if let Ok(mut s) = detect_meeting_patterns() {
+        all.append(&mut s);
+    }
+    if let Ok(mut s) = detect_knowledge_opportunities() {
         all.append(&mut s);
     }
 
