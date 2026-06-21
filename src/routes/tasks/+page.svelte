@@ -246,8 +246,9 @@
         </h2>
 
         <div>
-          <label class="block text-ivory-muted text-xs tracking-wider uppercase mb-2">Title</label>
+          <label for="task-title" class="block text-ivory-muted text-xs tracking-wider uppercase mb-2">Title</label>
           <input
+            id="task-title"
             type="text"
             bind:value={formTitle}
             placeholder="What needs to be done?"
@@ -256,8 +257,9 @@
         </div>
 
         <div>
-          <label class="block text-ivory-muted text-xs tracking-wider uppercase mb-2">Description</label>
+          <label for="task-desc" class="block text-ivory-muted text-xs tracking-wider uppercase mb-2">Description</label>
           <textarea
+            id="task-desc"
             bind:value={formDescription}
             rows="3"
             placeholder="Optional details..."
@@ -267,8 +269,9 @@
 
         <div class="grid grid-cols-3 gap-4">
           <div>
-            <label class="block text-ivory-muted text-xs tracking-wider uppercase mb-2">Priority</label>
+            <label for="task-priority" class="block text-ivory-muted text-xs tracking-wider uppercase mb-2">Priority</label>
             <select
+              id="task-priority"
               bind:value={formPriority}
               class="w-full px-4 py-2.5 bg-surface-raised border border-border rounded-lg text-ivory text-sm focus:outline-none focus:border-gold/50 transition-colors"
             >
@@ -279,8 +282,9 @@
             </select>
           </div>
           <div>
-            <label class="block text-ivory-muted text-xs tracking-wider uppercase mb-2">Category</label>
+            <label for="task-category" class="block text-ivory-muted text-xs tracking-wider uppercase mb-2">Category</label>
             <input
+              id="task-category"
               type="text"
               bind:value={formCategory}
               placeholder="e.g. work, personal"
@@ -288,8 +292,9 @@
             />
           </div>
           <div>
-            <label class="block text-ivory-muted text-xs tracking-wider uppercase mb-2">Due Date</label>
+            <label for="task-due" class="block text-ivory-muted text-xs tracking-wider uppercase mb-2">Due Date</label>
             <input
+              id="task-due"
               type="date"
               bind:value={formDueDate}
               class="w-full px-4 py-2.5 bg-surface-raised border border-border rounded-lg text-ivory text-sm focus:outline-none focus:border-gold/50 transition-colors"

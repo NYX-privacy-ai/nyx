@@ -255,8 +255,9 @@
           </h2>
 
           <div>
-            <label class="block text-ivory-muted text-xs tracking-wider uppercase mb-2">Title</label>
+            <label for="wiki-title" class="block text-ivory-muted text-xs tracking-wider uppercase mb-2">Title</label>
             <input
+              id="wiki-title"
               type="text"
               bind:value={formTitle}
               placeholder="Entry title"
@@ -265,8 +266,9 @@
           </div>
 
           <div>
-            <label class="block text-ivory-muted text-xs tracking-wider uppercase mb-2">Content</label>
+            <label for="wiki-content" class="block text-ivory-muted text-xs tracking-wider uppercase mb-2">Content</label>
             <textarea
+              id="wiki-content"
               bind:value={formContent}
               rows="10"
               placeholder="Write your knowledge entry..."
@@ -276,8 +278,9 @@
 
           <div class="grid grid-cols-2 gap-4">
             <div>
-              <label class="block text-ivory-muted text-xs tracking-wider uppercase mb-2">Category</label>
+              <label for="wiki-category" class="block text-ivory-muted text-xs tracking-wider uppercase mb-2">Category</label>
               <select
+                id="wiki-category"
                 bind:value={formCategory}
                 class="w-full px-4 py-2.5 bg-surface-raised border border-border rounded-lg text-ivory text-sm focus:outline-none focus:border-gold/50 transition-colors"
               >
@@ -287,8 +290,9 @@
               </select>
             </div>
             <div>
-              <label class="block text-ivory-muted text-xs tracking-wider uppercase mb-2">Tags</label>
+              <label for="wiki-tags" class="block text-ivory-muted text-xs tracking-wider uppercase mb-2">Tags</label>
               <input
+                id="wiki-tags"
                 type="text"
                 bind:value={formTags}
                 placeholder="comma-separated tags"

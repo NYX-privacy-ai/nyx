@@ -237,8 +237,9 @@
 
         <!-- Name -->
         <div>
-          <label class="block text-ivory-muted text-xs tracking-wider uppercase mb-2">Name</label>
+          <label for="sched-name" class="block text-ivory-muted text-xs tracking-wider uppercase mb-2">Name</label>
           <input
+            id="sched-name"
             type="text"
             bind:value={formName}
             placeholder="e.g. Morning Briefing"
@@ -248,7 +249,7 @@
 
         <!-- Schedule Type -->
         <div>
-          <label class="block text-ivory-muted text-xs tracking-wider uppercase mb-2">Schedule Type</label>
+          <span class="block text-ivory-muted text-xs tracking-wider uppercase mb-2">Schedule Type</span>
           <div class="flex gap-3">
             <button
               onclick={() => formScheduleKind = 'cron'}
@@ -269,8 +270,9 @@
         {#if formScheduleKind === 'cron'}
           <div class="grid grid-cols-2 gap-4">
             <div>
-              <label class="block text-ivory-muted text-xs tracking-wider uppercase mb-2">Cron Expression</label>
+              <label for="sched-cron" class="block text-ivory-muted text-xs tracking-wider uppercase mb-2">Cron Expression</label>
               <input
+                id="sched-cron"
                 type="text"
                 bind:value={formCronExpr}
                 placeholder="0 9 * * *"
@@ -279,8 +281,9 @@
               <p class="text-ivory-muted/50 text-xs mt-1">min hour dom mon dow</p>
             </div>
             <div>
-              <label class="block text-ivory-muted text-xs tracking-wider uppercase mb-2">Timezone</label>
+              <label for="sched-tz" class="block text-ivory-muted text-xs tracking-wider uppercase mb-2">Timezone</label>
               <input
+                id="sched-tz"
                 type="text"
                 bind:value={formTimezone}
                 placeholder="Europe/London"
@@ -290,10 +293,11 @@
           </div>
         {:else}
           <div>
-            <label class="block text-ivory-muted text-xs tracking-wider uppercase mb-2">
+            <label for="sched-interval" class="block text-ivory-muted text-xs tracking-wider uppercase mb-2">
               Interval (hours)
             </label>
             <input
+              id="sched-interval"
               type="number"
               bind:value={formIntervalHours}
               min="0.5"
@@ -306,10 +310,11 @@
 
         <!-- Message -->
         <div>
-          <label class="block text-ivory-muted text-xs tracking-wider uppercase mb-2">
+          <label for="sched-message" class="block text-ivory-muted text-xs tracking-wider uppercase mb-2">
             Agent Instruction
           </label>
           <textarea
+            id="sched-message"
             bind:value={formMessage}
             rows="4"
             placeholder="What should the agent do when this fires?"
