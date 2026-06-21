@@ -13,9 +13,7 @@ pub async fn check_gog_available() -> Result<GogStatus, String> {
     // Try ~/.nyx/bin/gog first, then PATH
     let gog_path = gog_binary_path();
 
-    let output = Command::new(&gog_path)
-        .args(["--version"])
-        .output();
+    let output = Command::new(&gog_path).args(["--version"]).output();
 
     match output {
         Ok(out) if out.status.success() => {
@@ -25,14 +23,16 @@ pub async fn check_gog_available() -> Result<GogStatus, String> {
                 .args(["calendar", "list", "--limit", "1"])
                 .output();
 
-            let authenticated = auth_check
-                .map(|o| o.status.success())
-                .unwrap_or(false);
+            let authenticated = auth_check.map(|o| o.status.success()).unwrap_or(false);
 
             Ok(GogStatus {
                 installed: true,
                 authenticated,
-                version: if version.is_empty() { None } else { Some(version) },
+                version: if version.is_empty() {
+                    None
+                } else {
+                    Some(version)
+                },
             })
         }
         _ => Ok(GogStatus {
@@ -103,9 +103,7 @@ pub async fn install_gog(app_handle: &tauri::AppHandle) -> Result<String, String
     }
 
     // Verify the macOS binary runs on the host
-    let verify = Command::new(&gog_path)
-        .args(["--version"])
-        .output();
+    let verify = Command::new(&gog_path).args(["--version"]).output();
 
     match verify {
         Ok(out) if out.status.success() => {
@@ -160,7 +158,11 @@ pub async fn send_email(
 
     if output.status.success() {
         let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
-        Ok(if stdout.is_empty() { "Email sent".to_string() } else { stdout })
+        Ok(if stdout.is_empty() {
+            "Email sent".to_string()
+        } else {
+            stdout
+        })
     } else {
         let stderr = String::from_utf8_lossy(&output.stderr);
         Err(format!("Failed to send email: {}", stderr))
@@ -200,7 +202,11 @@ pub async fn create_draft(
 
     if output.status.success() {
         let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
-        Ok(if stdout.is_empty() { "Draft created".to_string() } else { stdout })
+        Ok(if stdout.is_empty() {
+            "Draft created".to_string()
+        } else {
+            stdout
+        })
     } else {
         let stderr = String::from_utf8_lossy(&output.stderr);
         Err(format!("Failed to create draft: {}", stderr))

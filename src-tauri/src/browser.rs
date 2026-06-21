@@ -96,8 +96,10 @@ const BROWSER_WINDOW_LABEL: &str = "browser";
 pub fn open(app: &AppHandle) -> Result<(), String> {
     // Check if window already exists
     if let Some(win) = app.get_webview_window(BROWSER_WINDOW_LABEL) {
-        win.show().map_err(|e| format!("Failed to show browser window: {}", e))?;
-        win.set_focus().map_err(|e| format!("Failed to focus browser window: {}", e))?;
+        win.show()
+            .map_err(|e| format!("Failed to show browser window: {}", e))?;
+        win.set_focus()
+            .map_err(|e| format!("Failed to focus browser window: {}", e))?;
         return Ok(());
     }
 
@@ -401,10 +403,7 @@ pub async fn wait(ms: u64) -> Result<(), String> {
 // ---------------------------------------------------------------------------
 
 /// Execute a BrowserAction (from Claude's tool_use) and return the result.
-pub async fn execute_action(
-    app: &AppHandle,
-    action: &BrowserAction,
-) -> BrowserActionResult {
+pub async fn execute_action(app: &AppHandle, action: &BrowserAction) -> BrowserActionResult {
     let action_name = action.action.as_str();
 
     // Emit action event to frontend activity feed
@@ -538,8 +537,8 @@ const MAX_ITERATIONS: usize = 25;
 /// Read the Anthropic API key from the Nyx .env file.
 fn read_anthropic_key() -> Result<String, String> {
     let env_path = crate::ironclaw::config_dir().join(".env");
-    let content = std::fs::read_to_string(&env_path)
-        .map_err(|e| format!("Failed to read .env: {}", e))?;
+    let content =
+        std::fs::read_to_string(&env_path).map_err(|e| format!("Failed to read .env: {}", e))?;
     for line in content.lines() {
         if line.starts_with("ANTHROPIC_API_KEY=") {
             let key = line.trim_start_matches("ANTHROPIC_API_KEY=").to_string();
@@ -649,8 +648,8 @@ pub async fn send_browse_message(
                     let input = block.get("input").cloned().unwrap_or(serde_json::json!({}));
 
                     // Parse the browser action
-                    let action: BrowserAction = serde_json::from_value(input.clone())
-                        .unwrap_or(BrowserAction {
+                    let action: BrowserAction =
+                        serde_json::from_value(input.clone()).unwrap_or(BrowserAction {
                             action: "read_page".to_string(),
                             url: None,
                             selector: None,
@@ -723,7 +722,9 @@ pub async fn send_browse_message(
             kind: "complete".to_string(),
             url: None,
             title: None,
-            message: Some("Reached maximum browsing steps (25). Here's what I've done so far.".to_string()),
+            message: Some(
+                "Reached maximum browsing steps (25). Here's what I've done so far.".to_string(),
+            ),
         },
     );
 

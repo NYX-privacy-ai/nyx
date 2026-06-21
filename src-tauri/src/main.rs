@@ -11,8 +11,8 @@ use nyx_lib::wallet;
 
 // Tauri-only modules (UI-specific or have Tauri dependencies)
 mod browser;
-mod clawdtalk;
 mod claudecode;
+mod clawdtalk;
 mod google;
 mod intelligence;
 mod knowledge;
@@ -277,7 +277,10 @@ async fn send_chat_message(message: String) -> Result<String, String> {
 }
 
 #[tauri::command]
-async fn send_chat_message_to_session(message: String, session_key: String) -> Result<String, String> {
+async fn send_chat_message_to_session(
+    message: String,
+    session_key: String,
+) -> Result<String, String> {
     gateway::send_message_to_session(message, session_key).await
 }
 
@@ -378,8 +381,7 @@ async fn get_zec_shield_quote(
 ) -> Result<oneclick::QuoteResponse, String> {
     let zec_address = config::get_zec_address()
         .ok_or_else(|| "No ZEC address configured. Add a ZEC wallet in Settings.".to_string())?;
-    let refund_to = config::get_near_account()
-        .unwrap_or_else(|| "nyx.near".to_string());
+    let refund_to = config::get_near_account().unwrap_or_else(|| "nyx.near".to_string());
     oneclick::get_zec_quote(&from_asset, &amount, &zec_address, &refund_to).await
 }
 
@@ -403,8 +405,7 @@ async fn execute_zec_shield(
 ) -> Result<oneclick::QuoteResponse, String> {
     let zec_address = config::get_zec_address()
         .ok_or_else(|| "No ZEC address configured. Add a ZEC wallet in Settings.".to_string())?;
-    let refund_to = config::get_near_account()
-        .unwrap_or_else(|| "nyx.near".to_string());
+    let refund_to = config::get_near_account().unwrap_or_else(|| "nyx.near".to_string());
     oneclick::execute_zec_shield(&from_asset, &amount, &zec_address, &refund_to).await
 }
 
@@ -438,8 +439,7 @@ async fn get_confidential_quote(
     destination_asset: String,
     amount: String,
 ) -> Result<oneclick::QuoteResponse, String> {
-    let near_account = config::get_near_account()
-        .unwrap_or_else(|| "nyx.near".to_string());
+    let near_account = config::get_near_account().unwrap_or_else(|| "nyx.near".to_string());
     oneclick::get_confidential_quote(
         &origin_asset,
         &destination_asset,
@@ -457,8 +457,7 @@ async fn execute_confidential_swap(
     destination_asset: String,
     amount: String,
 ) -> Result<oneclick::QuoteResponse, String> {
-    let near_account = config::get_near_account()
-        .unwrap_or_else(|| "nyx.near".to_string());
+    let near_account = config::get_near_account().unwrap_or_else(|| "nyx.near".to_string());
     oneclick::execute_confidential_swap(
         &origin_asset,
         &destination_asset,
@@ -754,12 +753,20 @@ fn browser_click(app: tauri::AppHandle, selector: String) -> Result<String, Stri
 }
 
 #[tauri::command]
-fn browser_type_text(app: tauri::AppHandle, selector: String, text: String) -> Result<String, String> {
+fn browser_type_text(
+    app: tauri::AppHandle,
+    selector: String,
+    text: String,
+) -> Result<String, String> {
     browser::type_text(&app, &selector, &text)
 }
 
 #[tauri::command]
-fn browser_scroll(app: tauri::AppHandle, direction: String, amount: Option<i32>) -> Result<String, String> {
+fn browser_scroll(
+    app: tauri::AppHandle,
+    direction: String,
+    amount: Option<i32>,
+) -> Result<String, String> {
     browser::scroll(&app, &direction, amount.unwrap_or(3))
 }
 
@@ -779,7 +786,11 @@ fn browser_read_forms(app: tauri::AppHandle) -> Result<String, String> {
 }
 
 #[tauri::command]
-fn browser_select_option(app: tauri::AppHandle, selector: String, value: String) -> Result<String, String> {
+fn browser_select_option(
+    app: tauri::AppHandle,
+    selector: String,
+    value: String,
+) -> Result<String, String> {
     browser::select_option(&app, &selector, &value)
 }
 
@@ -825,10 +836,13 @@ fn clawdtalk_configure(api_key: String) -> Result<(), String> {
     let content = std::fs::read_to_string(&env_path).unwrap_or_default();
 
     // Check if CLAWDTALK_API_KEY already exists
-    let has_key = content.lines().any(|l| l.trim().starts_with("CLAWDTALK_API_KEY="));
+    let has_key = content
+        .lines()
+        .any(|l| l.trim().starts_with("CLAWDTALK_API_KEY="));
 
     let updated = if has_key {
-        content.lines()
+        content
+            .lines()
             .map(|l| {
                 if l.trim().starts_with("CLAWDTALK_API_KEY=") {
                     format!("CLAWDTALK_API_KEY={}", api_key)
@@ -839,11 +853,14 @@ fn clawdtalk_configure(api_key: String) -> Result<(), String> {
             .collect::<Vec<_>>()
             .join("\n")
     } else {
-        format!("{}\n# ClawdTalk Voice\nCLAWDTALK_API_KEY={}\n", content.trim_end(), api_key)
+        format!(
+            "{}\n# ClawdTalk Voice\nCLAWDTALK_API_KEY={}\n",
+            content.trim_end(),
+            api_key
+        )
     };
 
-    std::fs::write(&env_path, updated)
-        .map_err(|e| format!("Failed to update .env: {}", e))?;
+    std::fs::write(&env_path, updated).map_err(|e| format!("Failed to update .env: {}", e))?;
 
     // chmod 600
     #[cfg(unix)]
@@ -877,8 +894,11 @@ fn clawdtalk_remove() -> Result<(), String> {
     // Remove key from .env
     let env_path = ironclaw::config_dir().join(".env");
     if let Ok(content) = std::fs::read_to_string(&env_path) {
-        let updated: Vec<&str> = content.lines()
-            .filter(|l| !l.trim().starts_with("CLAWDTALK_API_KEY=") && l.trim() != "# ClawdTalk Voice")
+        let updated: Vec<&str> = content
+            .lines()
+            .filter(|l| {
+                !l.trim().starts_with("CLAWDTALK_API_KEY=") && l.trim() != "# ClawdTalk Voice"
+            })
             .collect();
         let _ = std::fs::write(&env_path, updated.join("\n") + "\n");
     }
@@ -937,13 +957,21 @@ fn create_scheduled_task(
             let ms: u64 = schedule_value
                 .parse()
                 .map_err(|_| "schedule_value must be a number (milliseconds) for 'every' kind")?;
-            config::CronSchedule::Every { every_ms: ms, anchor_ms: None }
+            config::CronSchedule::Every {
+                every_ms: ms,
+                anchor_ms: None,
+            }
         }
         "cron" => config::CronSchedule::Cron {
             expr: schedule_value,
             tz: timezone,
         },
-        other => return Err(format!("Unknown schedule_kind '{}'. Use 'every' or 'cron'.", other)),
+        other => {
+            return Err(format!(
+                "Unknown schedule_kind '{}'. Use 'every' or 'cron'.",
+                other
+            ))
+        }
     };
 
     config::create_cron_job(name, schedule, message, enabled.unwrap_or(true))
@@ -964,14 +992,20 @@ fn update_scheduled_task(
             let ms: u64 = val
                 .parse()
                 .map_err(|_| "schedule_value must be a number (milliseconds) for 'every' kind")?;
-            Some(config::CronSchedule::Every { every_ms: ms, anchor_ms: None })
+            Some(config::CronSchedule::Every {
+                every_ms: ms,
+                anchor_ms: None,
+            })
         }
         (Some("cron"), Some(val)) => Some(config::CronSchedule::Cron {
             expr: val,
             tz: timezone,
         }),
         (Some(other), _) => {
-            return Err(format!("Unknown schedule_kind '{}'. Use 'every' or 'cron'.", other))
+            return Err(format!(
+                "Unknown schedule_kind '{}'. Use 'every' or 'cron'.",
+                other
+            ))
         }
         _ => None,
     };
@@ -997,7 +1031,10 @@ fn delete_scheduled_task(id: String) -> Result<(), String> {
 // ---------------------------------------------------------------------------
 
 #[tauri::command]
-fn list_tasks(status: Option<String>, category: Option<String>) -> Result<Vec<tasks::Task>, String> {
+fn list_tasks(
+    status: Option<String>,
+    category: Option<String>,
+) -> Result<Vec<tasks::Task>, String> {
     tasks::list_tasks(status.as_deref(), category.as_deref())
 }
 
@@ -1026,7 +1063,10 @@ fn get_task_stats() -> Result<tasks::TaskStats, String> {
 // ---------------------------------------------------------------------------
 
 #[tauri::command]
-fn list_knowledge(category: Option<String>, limit: Option<u32>) -> Result<Vec<knowledge::KnowledgeEntry>, String> {
+fn list_knowledge(
+    category: Option<String>,
+    limit: Option<u32>,
+) -> Result<Vec<knowledge::KnowledgeEntry>, String> {
     knowledge::list_entries(category.as_deref(), limit)
 }
 
@@ -1041,12 +1081,17 @@ fn get_knowledge_entry(id: i64) -> Result<knowledge::KnowledgeEntry, String> {
 }
 
 #[tauri::command]
-fn create_knowledge_entry(input: knowledge::CreateKnowledgeInput) -> Result<knowledge::KnowledgeEntry, String> {
+fn create_knowledge_entry(
+    input: knowledge::CreateKnowledgeInput,
+) -> Result<knowledge::KnowledgeEntry, String> {
     knowledge::create_entry(input)
 }
 
 #[tauri::command]
-fn update_knowledge_entry(id: i64, input: knowledge::UpdateKnowledgeInput) -> Result<knowledge::KnowledgeEntry, String> {
+fn update_knowledge_entry(
+    id: i64,
+    input: knowledge::UpdateKnowledgeInput,
+) -> Result<knowledge::KnowledgeEntry, String> {
     knowledge::update_entry(id, input)
 }
 

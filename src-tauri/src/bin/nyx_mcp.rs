@@ -7,8 +7,8 @@
 // Register with: claude mcp add --transport stdio nyx -- /path/to/nyx-mcp
 // ---------------------------------------------------------------------------
 
-use rmcp::ServiceExt;
 use rmcp::transport::stdio;
+use rmcp::ServiceExt;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -17,13 +17,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let server = nyx_lib::mcp::NyxMcpServer::new();
 
-    let service = server
-        .serve(stdio())
-        .await
-        .map_err(|e| {
-            eprintln!("MCP server error: {:?}", e);
-            e
-        })?;
+    let service = server.serve(stdio()).await.map_err(|e| {
+        eprintln!("MCP server error: {:?}", e);
+        e
+    })?;
 
     eprintln!("nyx-mcp ready — waiting for MCP client");
     service.waiting().await?;

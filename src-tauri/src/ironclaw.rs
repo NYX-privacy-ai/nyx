@@ -400,7 +400,10 @@ pub async fn check_and_auto_upgrade() {
 
             // Restart daemon with the new binary
             if let Err(e) = start_daemon().await {
-                eprintln!("[nyx] Warning: failed to restart daemon after upgrade: {}", e);
+                eprintln!(
+                    "[nyx] Warning: failed to restart daemon after upgrade: {}",
+                    e
+                );
             } else {
                 eprintln!("[nyx] Daemon restarted with upgraded IronClaw binary");
             }
