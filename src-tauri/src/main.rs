@@ -137,10 +137,30 @@ async fn generate_wallet() -> Result<wallet::WalletInfo, String> {
     Ok(info)
 }
 
-/// Generate a NEAR wallet and return both the info and config.
+/// Generate a NEAR wallet, persist its key material, and return both the info
+/// and config.
+///
+/// The key is persisted *here*, at generation time, rather than being
+/// round-tripped back through the frontend into `run_setup_v2`. The v2 setup
+/// flow only sends back non-secret `WalletConfig` metadata (id/address/label),
+/// so without this the generated private key was shown once in the backup modal
+/// and then lost — the wallet became unrecoverable and DeFi signing could never
+/// load it. Persisting in Rust also keeps the secret out of the JS layer.
 #[tauri::command]
 async fn generate_near_wallet_full() -> Result<(wallet::WalletInfo, config::WalletConfig), String> {
-    wallet::generate_near_wallet().await
+    let (info, wallet_config) = wallet::generate_near_wallet().await?;
+
+    // Wallet generation can run before `run_setup_v2` calls create_directories(),
+    // so ensure ~/.nyx/secrets exists (with restrictive perms) before writing.
+    config::create_directories()?;
+    let secrets_dir = ironclaw::config_dir().join("secrets");
+
+    // Legacy single-wallet file (read by the NEAR DeFi helper) + per-wallet key
+    // file keyed by the same id the UI later sends to run_setup_v2.
+    wallet::save_wallet(&info, &secrets_dir)?;
+    wallet::save_wallet_key(&wallet_config.id, &info)?;
+
+    Ok((info, wallet_config))
 }
 
 /// Validate a wallet address for a given chain.

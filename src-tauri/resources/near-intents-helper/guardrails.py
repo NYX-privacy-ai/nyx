@@ -67,13 +67,17 @@ class Guardrails:
     """Enforce DeFi trading guardrails."""
 
     def __init__(self, state_dir: Optional[Path] = None, env_file: Optional[str] = None):
-        self.state_dir = state_dir or (Path.home() / ".openclaw" / "defi-state")
+        self.state_dir = state_dir or (Path.home() / ".nyx" / "defi-state")
         self.state_dir.mkdir(parents=True, exist_ok=True)
 
         # Load config from env file (if available), then overlay with env vars.
         # In container mode, guardrails are injected as env vars directly —
         # no secrets file mount needed.
-        env_path = env_file or str(Path.home() / ".openclaw" / "secrets" / "defi_guardrails.env")
+        # NOTE: this default must match where the Rust setup writes the file
+        # (config.rs write_guardrails -> ~/.nyx/secrets/defi_guardrails.env).
+        # It previously pointed at ~/.openclaw, so the helper never saw the
+        # user's guardrails and silently used DEFAULTS.
+        env_path = env_file or str(Path.home() / ".nyx" / "secrets" / "defi_guardrails.env")
         if Path(env_path).exists():
             load_dotenv(env_path)
 
