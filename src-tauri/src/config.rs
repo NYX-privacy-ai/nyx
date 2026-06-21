@@ -1743,6 +1743,56 @@ fn copy_dir_contents(src: &Path, dst: &Path) -> Result<(), String> {
     Ok(())
 }
 
+// ---------------------------------------------------------------------------
+// Local data purge ("factory reset")
+// ---------------------------------------------------------------------------
+
+/// True only when `nyx_dir` is exactly `<home>/.nyx`. Used to guard the purge
+/// so a misconfigured HOME (or a future refactor) can never turn the wipe into
+/// an `rm -rf` of an unrelated directory.
+fn is_safe_nyx_dir(nyx_dir: &Path, home: &Path) -> bool {
+    nyx_dir.file_name().and_then(|s| s.to_str()) == Some(".nyx") && nyx_dir.parent() == Some(home)
+}
+
+/// Permanently delete ALL local Nyx data: wallet keys, provider/bot/gateway
+/// secrets (`.env`), guardrails, ClawdTalk config, the gateway/session/
+/// intelligence/ironclaw databases, caches, logs and workspace docs — i.e. the
+/// entire `~/.nyx` tree. This is a full local wipe; the user must re-run setup
+/// afterwards. Callers should stop the daemon first.
+///
+/// Returns the sorted list of top-level entries that were removed (for an audit
+/// summary). Refuses to act on anything that is not exactly `$HOME/.nyx`.
+pub fn purge_local_data() -> Result<Vec<String>, String> {
+    let home = home_dir();
+    let nyx_dir = home.join(".nyx");
+
+    if !is_safe_nyx_dir(&nyx_dir, &home) {
+        return Err(format!(
+            "refusing to purge: {} is not exactly $HOME/.nyx",
+            nyx_dir.display()
+        ));
+    }
+    if !nyx_dir.exists() {
+        return Ok(vec![]);
+    }
+
+    // Record what was there before removing, for the report.
+    let mut removed = Vec::new();
+    if let Ok(entries) = fs::read_dir(&nyx_dir) {
+        for entry in entries.flatten() {
+            if let Some(name) = entry.file_name().to_str() {
+                removed.push(name.to_string());
+            }
+        }
+    }
+    removed.sort();
+
+    fs::remove_dir_all(&nyx_dir)
+        .map_err(|e| format!("Failed to remove {}: {}", nyx_dir.display(), e))?;
+
+    Ok(removed)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1837,5 +1887,17 @@ mod tests {
         let mut g = balanced();
         g.max_transaction_usd = 50_000_000.0;
         assert!(g.validate().is_err());
+    }
+
+    #[test]
+    fn purge_guard_accepts_only_home_dot_nyx() {
+        let home = Path::new("/Users/someone");
+        // The one path the purge is allowed to wipe.
+        assert!(is_safe_nyx_dir(&home.join(".nyx"), home));
+        // Wrong name, nested, and not-under-home must all be refused.
+        assert!(!is_safe_nyx_dir(&home.join(".config"), home));
+        assert!(!is_safe_nyx_dir(&home.join("projects/.nyx"), home));
+        assert!(!is_safe_nyx_dir(Path::new("/tmp/.nyx"), home));
+        assert!(!is_safe_nyx_dir(Path::new("/.nyx"), home));
     }
 }

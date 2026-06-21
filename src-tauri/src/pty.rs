@@ -33,7 +33,16 @@ static SESSIONS: std::sync::LazyLock<Mutex<HashMap<String, PtySession>>> =
 // Public API
 // ---------------------------------------------------------------------------
 
-/// Spawn a command in a new PTY session.
+/// Commands the embedded terminal is permitted to launch.
+///
+/// The frontend only ever needs to start `claude` (see code/+page.svelte).
+/// Accepting an arbitrary command string from the webview meant any injected
+/// or compromised JS could `invoke('pty_spawn', { command: '/bin/sh' })` and
+/// get an interactive shell with the user's full environment and PATH. Keep
+/// this list minimal; reject anything not on it.
+const ALLOWED_COMMANDS: &[&str] = &["claude"];
+
+/// Spawn an allowlisted command in a new PTY session.
 /// Returns a session ID. Output is streamed via `pty:output` Tauri events.
 pub fn spawn(
     app: AppHandle,
@@ -42,6 +51,12 @@ pub fn spawn(
     rows: u16,
 ) -> Result<String, String> {
     let cmd = command.unwrap_or_else(|| "claude".to_string());
+    if !ALLOWED_COMMANDS.contains(&cmd.as_str()) {
+        return Err(format!(
+            "pty spawn rejected: '{}' is not an allowed command",
+            cmd
+        ));
+    }
     let session_id = uuid::Uuid::new_v4().to_string();
 
     let pty_system = native_pty_system();
