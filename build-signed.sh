@@ -21,12 +21,23 @@ fi
 
 echo "==> Step 1: Building unsigned app via Tauri..."
 rm -rf "${BUNDLE_DIR}" "src-tauri/target/release/bundle/dmg"
-npm run tauri build 2>&1 || true
-# Tauri may exit 1 due to missing TAURI_SIGNING_PRIVATE_KEY (updater),
-# but the .app bundle is still produced. Check it exists:
+# Tauri may exit non-zero *solely* because TAURI_SIGNING_PRIVATE_KEY is unset
+# (updater artifact signing) while still producing the .app bundle. We must not
+# blanket-swallow the failure with `|| true`, or a real build break (compile
+# error, missing dep) would be hidden. Instead: capture the status, and only
+# tolerate it when the .app actually got built. Any other failure aborts loudly.
+set +e
+npm run tauri build 2>&1 | tee /tmp/nyx-tauri-build.log
+build_status=${PIPESTATUS[0]}
+set -e
 if [[ ! -d "${APP_PATH}" ]]; then
-    echo "ERROR: ${APP_PATH} was not created. Build failed."
+    echo "ERROR: ${APP_PATH} was not created. Tauri build failed (exit ${build_status})."
+    echo "       See /tmp/nyx-tauri-build.log for the full build output."
     exit 1
+fi
+if [[ "${build_status}" -ne 0 ]]; then
+    echo "WARNING: tauri build exited ${build_status} but the .app bundle exists"
+    echo "         (expected when TAURI_SIGNING_PRIVATE_KEY is unset). Continuing."
 fi
 echo "    App bundle created at ${APP_PATH}"
 
