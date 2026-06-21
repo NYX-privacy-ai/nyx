@@ -60,10 +60,7 @@ fn find_claude_binary() -> Option<String> {
 
 /// Get Claude Code version string.
 fn get_claude_version(binary_path: &str) -> Option<String> {
-    let output = Command::new(binary_path)
-        .arg("--version")
-        .output()
-        .ok()?;
+    let output = Command::new(binary_path).arg("--version").output().ok()?;
 
     if output.status.success() {
         let version = String::from_utf8_lossy(&output.stdout).trim().to_string();
@@ -122,9 +119,7 @@ pub fn check_status() -> Result<ClaudeCodeStatus, String> {
     let binary_path = find_claude_binary();
     let installed = binary_path.is_some();
 
-    let version = binary_path
-        .as_ref()
-        .and_then(|p| get_claude_version(p));
+    let version = binary_path.as_ref().and_then(|p| get_claude_version(p));
 
     let mcp_registered = if installed {
         check_mcp_registered()
@@ -193,8 +188,8 @@ pub async fn register_mcp_server() -> Result<String, String> {
 
 /// Unregister Nyx MCP server from Claude Code.
 pub async fn unregister_mcp_server() -> Result<(), String> {
-    let claude_path = find_claude_binary()
-        .ok_or_else(|| "Claude Code CLI not found.".to_string())?;
+    let claude_path =
+        find_claude_binary().ok_or_else(|| "Claude Code CLI not found.".to_string())?;
 
     let output = Command::new(&claude_path)
         .args(["mcp", "remove", "nyx"])

@@ -20,12 +20,12 @@ pub struct Task {
     pub id: i64,
     pub title: String,
     pub description: Option<String>,
-    pub status: String,       // pending | in_progress | completed | cancelled
-    pub priority: String,     // urgent | high | normal | low
+    pub status: String,   // pending | in_progress | completed | cancelled
+    pub priority: String, // urgent | high | normal | low
     pub category: Option<String>,
     pub due_date: Option<String>,
-    pub source: Option<String>,       // manual | suggestion | email | calendar | chat
-    pub source_ref: Option<String>,   // suggestion_id, email thread, etc.
+    pub source: Option<String>, // manual | suggestion | email | calendar | chat
+    pub source_ref: Option<String>, // suggestion_id, email thread, etc.
     pub created_at: String,
     pub updated_at: String,
     pub completed_at: Option<String>,
@@ -95,7 +95,10 @@ pub fn init_tables(conn: &Connection) -> Result<(), String> {
 // CRUD operations
 // ---------------------------------------------------------------------------
 
-pub fn list_tasks(status_filter: Option<&str>, category_filter: Option<&str>) -> Result<Vec<Task>, String> {
+pub fn list_tasks(
+    status_filter: Option<&str>,
+    category_filter: Option<&str>,
+) -> Result<Vec<Task>, String> {
     let conn = intelligence::open_db_pub()?;
     let mut query = "SELECT id, title, description, status, priority, category, due_date, source, source_ref, created_at, updated_at, completed_at FROM tasks WHERE 1=1".to_string();
     let mut params_vec: Vec<Box<dyn rusqlite::types::ToSql>> = vec![];
@@ -110,7 +113,8 @@ pub fn list_tasks(status_filter: Option<&str>, category_filter: Option<&str>) ->
     }
     query.push_str(" ORDER BY CASE priority WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 WHEN 'normal' THEN 2 ELSE 3 END, due_date ASC NULLS LAST, created_at DESC");
 
-    let params_refs: Vec<&dyn rusqlite::types::ToSql> = params_vec.iter().map(|p| p.as_ref()).collect();
+    let params_refs: Vec<&dyn rusqlite::types::ToSql> =
+        params_vec.iter().map(|p| p.as_ref()).collect();
     let mut stmt = conn.prepare(&query).map_err(|e| e.to_string())?;
     let rows = stmt
         .query_map(params_refs.as_slice(), |row| {
@@ -211,12 +215,17 @@ pub fn update_task(id: i64, input: UpdateTaskInput) -> Result<Task, String> {
         params_vec.len()
     );
 
-    let params_refs: Vec<&dyn rusqlite::types::ToSql> = params_vec.iter().map(|p| p.as_ref()).collect();
-    conn.execute(&query, params_refs.as_slice()).map_err(|e| e.to_string())?;
+    let params_refs: Vec<&dyn rusqlite::types::ToSql> =
+        params_vec.iter().map(|p| p.as_ref()).collect();
+    conn.execute(&query, params_refs.as_slice())
+        .map_err(|e| e.to_string())?;
 
     // Return updated task
     let tasks = list_tasks(None, None)?;
-    tasks.into_iter().find(|t| t.id == id).ok_or_else(|| "Task not found".to_string())
+    tasks
+        .into_iter()
+        .find(|t| t.id == id)
+        .ok_or_else(|| "Task not found".to_string())
 }
 
 pub fn delete_task(id: i64) -> Result<(), String> {
@@ -231,13 +240,25 @@ pub fn get_task_stats() -> Result<TaskStats, String> {
     let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
 
     let total: u32 = conn
-        .query_row("SELECT COUNT(*) FROM tasks WHERE status != 'cancelled'", [], |r| r.get(0))
+        .query_row(
+            "SELECT COUNT(*) FROM tasks WHERE status != 'cancelled'",
+            [],
+            |r| r.get(0),
+        )
         .unwrap_or(0);
     let pending: u32 = conn
-        .query_row("SELECT COUNT(*) FROM tasks WHERE status = 'pending'", [], |r| r.get(0))
+        .query_row(
+            "SELECT COUNT(*) FROM tasks WHERE status = 'pending'",
+            [],
+            |r| r.get(0),
+        )
         .unwrap_or(0);
     let in_progress: u32 = conn
-        .query_row("SELECT COUNT(*) FROM tasks WHERE status = 'in_progress'", [], |r| r.get(0))
+        .query_row(
+            "SELECT COUNT(*) FROM tasks WHERE status = 'in_progress'",
+            [],
+            |r| r.get(0),
+        )
         .unwrap_or(0);
     let completed_today: u32 = conn
         .query_row(
@@ -254,5 +275,11 @@ pub fn get_task_stats() -> Result<TaskStats, String> {
         )
         .unwrap_or(0);
 
-    Ok(TaskStats { total, pending, in_progress, completed_today, overdue })
+    Ok(TaskStats {
+        total,
+        pending,
+        in_progress,
+        completed_today,
+        overdue,
+    })
 }

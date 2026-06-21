@@ -6,10 +6,9 @@
 // ---------------------------------------------------------------------------
 
 use rmcp::{
-    ServerHandler,
     handler::server::{router::tool::ToolRouter, wrapper::Parameters},
     model::{ServerCapabilities, ServerInfo},
-    tool, tool_handler, tool_router,
+    tool, tool_handler, tool_router, ServerHandler,
 };
 
 use crate::config;
@@ -114,7 +113,9 @@ impl Default for NyxMcpServer {
 #[tool_router]
 impl NyxMcpServer {
     /// Send a message to the Nyx agent and get a response.
-    #[tool(description = "Send a message to the Nyx agent and get a response. The agent can search the web, manage calendars, execute DeFi operations, and more.")]
+    #[tool(
+        description = "Send a message to the Nyx agent and get a response. The agent can search the web, manage calendars, execute DeFi operations, and more."
+    )]
     async fn nyx_chat(&self, Parameters(params): Parameters<ChatParams>) -> String {
         let session = params
             .session_key
@@ -127,7 +128,9 @@ impl NyxMcpServer {
     }
 
     /// Get the current DeFi portfolio data.
-    #[tool(description = "Get the current DeFi portfolio data including positions, allocation, health status, and recent activity.")]
+    #[tool(
+        description = "Get the current DeFi portfolio data including positions, allocation, health status, and recent activity."
+    )]
     async fn nyx_portfolio(&self) -> String {
         match portfolio_data::read_portfolio().await {
             Ok(data) => serde_json::to_string_pretty(&data)
@@ -137,7 +140,9 @@ impl NyxMcpServer {
     }
 
     /// Analyse a URL or claim for credibility.
-    #[tool(description = "Analyse a URL or claim for credibility. Returns a detailed credibility score across 6 dimensions including source reputation, corroboration, and evidence quality.")]
+    #[tool(
+        description = "Analyse a URL or claim for credibility. Returns a detailed credibility score across 6 dimensions including source reputation, corroboration, and evidence quality."
+    )]
     async fn nyx_verify_source(
         &self,
         Parameters(params): Parameters<VerifySourceParams>,
@@ -149,7 +154,9 @@ impl NyxMcpServer {
     }
 
     /// Check the Nyx IronClaw daemon status.
-    #[tool(description = "Check the Nyx IronClaw daemon status including whether it's running, the version, and gateway port.")]
+    #[tool(
+        description = "Check the Nyx IronClaw daemon status including whether it's running, the version, and gateway port."
+    )]
     async fn nyx_ironclaw_status(&self) -> String {
         match ironclaw::check_ironclaw_detailed().await {
             Ok(status) => serde_json::to_string_pretty(&status)
@@ -159,7 +166,9 @@ impl NyxMcpServer {
     }
 
     /// List or create chat sessions.
-    #[tool(description = "List or create chat sessions. Use action 'list' to get all sessions, or 'create' with an optional title to start a new session.")]
+    #[tool(
+        description = "List or create chat sessions. Use action 'list' to get all sessions, or 'create' with an optional title to start a new session."
+    )]
     async fn nyx_sessions(&self, Parameters(params): Parameters<SessionsParams>) -> String {
         match params.action.as_str() {
             "list" => match gateway::list_sessions() {
@@ -176,41 +185,41 @@ impl NyxMcpServer {
     }
 
     /// Get a cross-chain swap quote for shielding or unshielding ZEC.
-    #[tool(description = "Get a cross-chain swap quote for shielding assets into Zcash (ZEC) or unshielding from ZEC to any supported crypto. Uses NEAR Intents for cross-chain routing.")]
+    #[tool(
+        description = "Get a cross-chain swap quote for shielding assets into Zcash (ZEC) or unshielding from ZEC to any supported crypto. Uses NEAR Intents for cross-chain routing."
+    )]
     async fn nyx_zec_quote(&self, Parameters(params): Parameters<ZecQuoteParams>) -> String {
         let result = match params.direction.as_str() {
             "shield" => {
                 let zec_address = match config::get_zec_address() {
                     Some(addr) => addr,
-                    None => return "Error: No ZEC address configured. Add a ZEC wallet in Settings.".to_string(),
+                    None => {
+                        return "Error: No ZEC address configured. Add a ZEC wallet in Settings."
+                            .to_string()
+                    }
                 };
-                let refund_to = config::get_near_account()
-                    .unwrap_or_else(|| "nyx.near".to_string());
+                let refund_to =
+                    config::get_near_account().unwrap_or_else(|| "nyx.near".to_string());
                 oneclick::get_zec_quote(&params.asset, &params.amount, &zec_address, &refund_to)
                     .await
             }
             "unshield" => {
                 let zec_refund = match config::get_zec_address() {
                     Some(addr) => addr,
-                    None => return "Error: No ZEC address configured. Add a ZEC wallet in Settings.".to_string(),
+                    None => {
+                        return "Error: No ZEC address configured. Add a ZEC wallet in Settings."
+                            .to_string()
+                    }
                 };
                 let recipient = match params.recipient {
                     Some(r) => r,
                     None => return "Error: recipient address required for unshield".to_string(),
                 };
-                oneclick::get_quote_from_zec(
-                    &params.asset,
-                    &params.amount,
-                    &recipient,
-                    &zec_refund,
-                )
-                .await
+                oneclick::get_quote_from_zec(&params.asset, &params.amount, &recipient, &zec_refund)
+                    .await
             }
             other => {
-                return format!(
-                    "Unknown direction '{}'. Use 'shield' or 'unshield'.",
-                    other
-                );
+                return format!("Unknown direction '{}'. Use 'shield' or 'unshield'.", other);
             }
         };
 
@@ -222,13 +231,14 @@ impl NyxMcpServer {
     }
 
     /// Get a confidential cross-chain swap quote via NEAR Confidential Intents.
-    #[tool(description = "Get a confidential cross-chain swap quote via NEAR Confidential Intents. Executes in a TEE-secured private shard — prevents MEV, frontrunning, and strategy leakage. Same speed and cost as public swaps, but transaction details remain confidential during execution.")]
+    #[tool(
+        description = "Get a confidential cross-chain swap quote via NEAR Confidential Intents. Executes in a TEE-secured private shard — prevents MEV, frontrunning, and strategy leakage. Same speed and cost as public swaps, but transaction details remain confidential during execution."
+    )]
     async fn nyx_confidential_quote(
         &self,
         Parameters(params): Parameters<ConfidentialQuoteParams>,
     ) -> String {
-        let near_account = config::get_near_account()
-            .unwrap_or_else(|| "nyx.near".to_string());
+        let near_account = config::get_near_account().unwrap_or_else(|| "nyx.near".to_string());
 
         let result = oneclick::get_confidential_quote(
             &params.origin_asset,
@@ -247,7 +257,9 @@ impl NyxMcpServer {
     }
 
     /// Manage scheduled tasks (cron jobs). Create, list, update, delete, enable or disable recurring agent tasks.
-    #[tool(description = "Manage scheduled tasks (cron jobs). Actions: 'list' all tasks, 'create' a new recurring task, 'update' an existing task, 'delete' a task, 'enable'/'disable' a task. Schedule format: 'every:3600000' (interval in ms) or 'cron:0 9 * * *:Europe/London' (cron expression with optional timezone).")]
+    #[tool(
+        description = "Manage scheduled tasks (cron jobs). Actions: 'list' all tasks, 'create' a new recurring task, 'update' an existing task, 'delete' a task, 'enable'/'disable' a task. Schedule format: 'every:3600000' (interval in ms) or 'cron:0 9 * * *:Europe/London' (cron expression with optional timezone)."
+    )]
     async fn nyx_schedule(&self, Parameters(params): Parameters<ScheduleParams>) -> String {
         match params.action.as_str() {
             "list" => match config::read_cron_jobs() {
@@ -273,8 +285,9 @@ impl NyxMcpServer {
                     Err(e) => return format!("Error: {}", e),
                 };
                 match config::create_cron_job(name, schedule, message, true) {
-                    Ok(job) => serde_json::to_string_pretty(&job)
-                        .unwrap_or_else(|_| "Created".to_string()),
+                    Ok(job) => {
+                        serde_json::to_string_pretty(&job).unwrap_or_else(|_| "Created".to_string())
+                    }
                     Err(e) => format!("Error: {}", e),
                 }
             }
@@ -299,8 +312,9 @@ impl NyxMcpServer {
                         enabled: None,
                     },
                 ) {
-                    Ok(job) => serde_json::to_string_pretty(&job)
-                        .unwrap_or_else(|_| "Updated".to_string()),
+                    Ok(job) => {
+                        serde_json::to_string_pretty(&job).unwrap_or_else(|_| "Updated".to_string())
+                    }
                     Err(e) => format!("Error: {}", e),
                 }
             }
@@ -344,7 +358,9 @@ impl NyxMcpServer {
     }
 
     /// Load recent message history from a session transcript. Useful for context handoff between sessions or platforms.
-    #[tool(description = "Load recent message history from a session transcript. Returns the last N messages from a given session. Useful for cross-platform session continuation or context handoff between different conversations.")]
+    #[tool(
+        description = "Load recent message history from a session transcript. Returns the last N messages from a given session. Useful for cross-platform session continuation or context handoff between different conversations."
+    )]
     async fn nyx_session_handoff(
         &self,
         Parameters(params): Parameters<SessionHandoffParams>,
@@ -367,7 +383,10 @@ fn parse_schedule_string(s: &str) -> Result<config::CronSchedule, String> {
         if ms < 60000 {
             return Err("Minimum interval is 60000ms (1 minute)".to_string());
         }
-        Ok(config::CronSchedule::Every { every_ms: ms, anchor_ms: None })
+        Ok(config::CronSchedule::Every {
+            every_ms: ms,
+            anchor_ms: None,
+        })
     } else if let Some(rest) = s.strip_prefix("cron:") {
         // Format: "cron:0 9 * * *" or "cron:0 9 * * *:Europe/London"
         // Cron expression has 5 fields; timezone is after the 5th field separator

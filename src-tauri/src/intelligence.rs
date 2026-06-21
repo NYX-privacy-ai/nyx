@@ -71,7 +71,7 @@ pub struct ActivityStats {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AutonomySetting {
     pub activity_type: String,
-    pub level: String,         // observe | suggest | draft | act
+    pub level: String, // observe | suggest | draft | act
     pub promoted_at: Option<String>,
     pub total_accepted: i64,
     pub total_dismissed: i64,
@@ -408,10 +408,15 @@ pub fn observe_calendar() -> Result<u32, String> {
 
     let output = Command::new(&gog)
         .args([
-            "calendar", "events", "primary",
-            "--from", &from,
-            "--to", &to,
-            "--max", "200",
+            "calendar",
+            "events",
+            "primary",
+            "--from",
+            &from,
+            "--to",
+            &to,
+            "--max",
+            "200",
             "--json",
             "--no-input",
         ])
@@ -426,15 +431,14 @@ pub fn observe_calendar() -> Result<u32, String> {
     let stdout = String::from_utf8_lossy(&output.stdout);
 
     // gog --json may return either a wrapper object with `items` or a direct array
-    let events: Vec<GogCalendarEvent> = if let Ok(resp) =
-        serde_json::from_str::<GogCalendarResponse>(&stdout)
-    {
-        resp.items.unwrap_or_default()
-    } else if let Ok(arr) = serde_json::from_str::<Vec<GogCalendarEvent>>(&stdout) {
-        arr
-    } else {
-        return Err("Failed to parse calendar JSON".to_string());
-    };
+    let events: Vec<GogCalendarEvent> =
+        if let Ok(resp) = serde_json::from_str::<GogCalendarResponse>(&stdout) {
+            resp.items.unwrap_or_default()
+        } else if let Ok(arr) = serde_json::from_str::<Vec<GogCalendarEvent>>(&stdout) {
+            arr
+        } else {
+            return Err("Failed to parse calendar JSON".to_string());
+        };
 
     let conn = open_db()?;
     let now = now_iso();
@@ -464,22 +468,17 @@ pub fn observe_calendar() -> Result<u32, String> {
             .attendees
             .as_ref()
             .map(|a| {
-                let emails: Vec<&str> = a
-                    .iter()
-                    .filter_map(|att| att.email.as_deref())
-                    .collect();
+                let emails: Vec<&str> = a.iter().filter_map(|att| att.email.as_deref()).collect();
                 serde_json::to_string(&emails).unwrap_or_else(|_| "[]".to_string())
             })
             .unwrap_or_else(|| "[]".to_string());
 
-        let is_recurring = event.recurrence.as_ref().map_or(0, |r| {
-            if r.is_empty() { 0 } else { 1 }
-        });
-
-        let organizer_email = event
-            .organizer
+        let is_recurring = event
+            .recurrence
             .as_ref()
-            .and_then(|o| o.email.as_deref());
+            .map_or(0, |r| if r.is_empty() { 0 } else { 1 });
+
+        let organizer_email = event.organizer.as_ref().and_then(|o| o.email.as_deref());
 
         // Upsert calendar event
         conn.execute(
@@ -537,9 +536,11 @@ pub fn observe_email() -> Result<u32, String> {
 
     let output = Command::new(&gog)
         .args([
-            "gmail", "search",
+            "gmail",
+            "search",
             "newer_than:24h",
-            "--max", "100",
+            "--max",
+            "100",
             "--json",
             "--no-input",
         ])
@@ -554,16 +555,15 @@ pub fn observe_email() -> Result<u32, String> {
     let stdout = String::from_utf8_lossy(&output.stdout);
 
     // gog --json may return a wrapper object or direct array of threads
-    let threads: Vec<GogGmailThread> = if let Ok(resp) =
-        serde_json::from_str::<GogGmailSearchResponse>(&stdout)
-    {
-        resp.threads.unwrap_or_default()
-    } else if let Ok(arr) = serde_json::from_str::<Vec<GogGmailThread>>(&stdout) {
-        arr
-    } else {
-        // Might be empty result
-        Vec::new()
-    };
+    let threads: Vec<GogGmailThread> =
+        if let Ok(resp) = serde_json::from_str::<GogGmailSearchResponse>(&stdout) {
+            resp.threads.unwrap_or_default()
+        } else if let Ok(arr) = serde_json::from_str::<Vec<GogGmailThread>>(&stdout) {
+            arr
+        } else {
+            // Might be empty result
+            Vec::new()
+        };
 
     let conn = open_db()?;
     let now = now_iso();
@@ -585,10 +585,7 @@ pub fn observe_email() -> Result<u32, String> {
                     None => continue,
                 };
 
-                let headers = msg
-                    .payload
-                    .as_ref()
-                    .and_then(|p| p.headers.as_ref());
+                let headers = msg.payload.as_ref().and_then(|p| p.headers.as_ref());
 
                 let from_email = headers
                     .and_then(|h| find_header(h, "From"))
@@ -617,7 +614,12 @@ pub fn observe_email() -> Result<u32, String> {
                         let tod = secs % 86400;
                         format!(
                             "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}Z",
-                            y, m, d, tod / 3600, (tod % 3600) / 60, tod % 60
+                            y,
+                            m,
+                            d,
+                            tod / 3600,
+                            (tod % 3600) / 60,
+                            tod % 60
                         )
                     })
                     .unwrap_or_else(|| now.clone());
@@ -639,8 +641,8 @@ pub fn observe_email() -> Result<u32, String> {
                     .as_ref()
                     .map(|l| serde_json::to_string(l).unwrap_or_else(|_| "[]".to_string()));
 
-                let to_json = serde_json::to_string(&to_emails)
-                    .unwrap_or_else(|_| "[]".to_string());
+                let to_json =
+                    serde_json::to_string(&to_emails).unwrap_or_else(|_| "[]".to_string());
 
                 // Insert email observation (skip if already seen)
                 let result = conn.execute(
@@ -708,31 +710,82 @@ struct SessionMessage {
 
 /// Keyword categories for message classification.
 const MEETING_KEYWORDS: &[&str] = &[
-    "meeting", "meet", "lunch", "dinner", "coffee", "call", "zoom", "teams",
-    "appointment", "catch up", "sync", "drinks", "brunch", "breakfast",
+    "meeting",
+    "meet",
+    "lunch",
+    "dinner",
+    "coffee",
+    "call",
+    "zoom",
+    "teams",
+    "appointment",
+    "catch up",
+    "sync",
+    "drinks",
+    "brunch",
+    "breakfast",
 ];
 const TRAVEL_KEYWORDS: &[&str] = &[
-    "flight", "train", "uber", "taxi", "airport", "hotel", "booking",
-    "travel", "trip", "journey", "drive", "pick up", "drop off",
+    "flight", "train", "uber", "taxi", "airport", "hotel", "booking", "travel", "trip", "journey",
+    "drive", "pick up", "drop off",
 ];
 const FOOD_KEYWORDS: &[&str] = &[
-    "restaurant", "reservation", "book a table", "dinner at", "lunch at",
-    "nopi", "dishoom", "brasserie", "bistro", "sushi", "pizza", "takeaway",
+    "restaurant",
+    "reservation",
+    "book a table",
+    "dinner at",
+    "lunch at",
+    "nopi",
+    "dishoom",
+    "brasserie",
+    "bistro",
+    "sushi",
+    "pizza",
+    "takeaway",
 ];
 const DEADLINE_KEYWORDS: &[&str] = &[
-    "deadline", "due", "by friday", "by monday", "by tomorrow",
-    "before", "submit", "expires", "expiring", "overdue",
+    "deadline",
+    "due",
+    "by friday",
+    "by monday",
+    "by tomorrow",
+    "before",
+    "submit",
+    "expires",
+    "expiring",
+    "overdue",
 ];
 const COMMITMENT_KEYWORDS: &[&str] = &[
-    "i'll call", "i'll message", "i'll text", "i'll get back to",
-    "i'll reply", "i need to reply", "remind me to call", "remind me to message",
-    "i'll ring", "i said i'd", "i promised", "i'll follow up",
-    "i'll chase", "i'll drop them a", "i'll send them",
+    "i'll call",
+    "i'll message",
+    "i'll text",
+    "i'll get back to",
+    "i'll reply",
+    "i need to reply",
+    "remind me to call",
+    "remind me to message",
+    "i'll ring",
+    "i said i'd",
+    "i promised",
+    "i'll follow up",
+    "i'll chase",
+    "i'll drop them a",
+    "i'll send them",
 ];
 const URGENCY_KEYWORDS: &[&str] = &[
-    "urgent", "asap", "time-sensitive", "time sensitive", "by end of day",
-    "need to know", "eod", "critical", "immediately", "right away",
-    "as soon as possible", "??", "!!!",
+    "urgent",
+    "asap",
+    "time-sensitive",
+    "time sensitive",
+    "by end of day",
+    "need to know",
+    "eod",
+    "critical",
+    "immediately",
+    "right away",
+    "as soon as possible",
+    "??",
+    "!!!",
 ];
 
 /// Observe recent messaging from Atlas session files on disk.
@@ -740,8 +793,7 @@ const URGENCY_KEYWORDS: &[&str] = &[
 /// from the last `hours` hours. Classifies each by topic keywords.
 pub fn observe_messaging(hours: u32) -> Result<u32, String> {
     let home = std::env::var("HOME").unwrap_or_default();
-    let sessions_path = std::path::PathBuf::from(&home)
-        .join(".nyx/sessions.db");
+    let sessions_path = std::path::PathBuf::from(&home).join(".nyx/sessions.db");
 
     let sessions_content = std::fs::read_to_string(&sessions_path)
         .map_err(|e| format!("Failed to read sessions.json: {}", e))?;
@@ -823,7 +875,14 @@ pub fn observe_messaging(hours: u32) -> Result<u32, String> {
 
         // Truncate for storage (keep first 200 chars as preview)
         let preview = if text.len() > 200 {
-            format!("{}...", &text[..text.char_indices().nth(200).map(|(i, _)| i).unwrap_or(text.len())])
+            format!(
+                "{}...",
+                &text[..text
+                    .char_indices()
+                    .nth(200)
+                    .map(|(i, _)| i)
+                    .unwrap_or(text.len())]
+            )
         } else {
             text.clone()
         };
@@ -876,18 +935,17 @@ pub fn observe_messaging(hours: u32) -> Result<u32, String> {
 fn extract_message_text(content: &Option<serde_json::Value>) -> String {
     match content {
         Some(serde_json::Value::String(s)) => s.clone(),
-        Some(serde_json::Value::Array(arr)) => {
-            arr.iter()
-                .filter_map(|item| {
-                    if item.get("type")?.as_str()? == "text" {
-                        item.get("text")?.as_str().map(String::from)
-                    } else {
-                        None
-                    }
-                })
-                .collect::<Vec<_>>()
-                .join(" ")
-        }
+        Some(serde_json::Value::Array(arr)) => arr
+            .iter()
+            .filter_map(|item| {
+                if item.get("type")?.as_str()? == "text" {
+                    item.get("text")?.as_str().map(String::from)
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>()
+            .join(" "),
         _ => String::new(),
     }
 }
@@ -1115,7 +1173,12 @@ pub fn get_unanswered_emails(hours: u32) -> Result<Vec<serde_json::Value>, Strin
     let tod = cutoff % 86400;
     let cutoff_iso = format!(
         "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}Z",
-        y, m, d, tod / 3600, (tod % 3600) / 60, tod % 60
+        y,
+        m,
+        d,
+        tod / 3600,
+        (tod % 3600) / 60,
+        tod % 60
     );
 
     let mut stmt = conn
@@ -1505,15 +1568,19 @@ pub fn detect_frequent_contacts() -> Result<Vec<Suggestion>, String> {
                 title: format!("Catch up with {}", display),
                 description: format!(
                     "{} has had {} interactions recently but hasn't been in touch since {}.",
-                    display, count, &last[..10.min(last.len())]
+                    display,
+                    count,
+                    &last[..10.min(last.len())]
                 ),
                 contact_email: Some(email),
                 confidence,
-                context: Some(serde_json::json!({
-                    "interaction_count": count,
-                    "last_seen": last,
-                })
-                .to_string()),
+                context: Some(
+                    serde_json::json!({
+                        "interaction_count": count,
+                        "last_seen": last,
+                    })
+                    .to_string(),
+                ),
                 status: "pending".to_string(),
                 created_at: now.clone(),
                 acted_at: None,
@@ -1572,16 +1639,20 @@ pub fn detect_unanswered_threads() -> Result<Vec<Suggestion>, String> {
                 title: format!("Reply to {} about \"{}\"", display, truncate(subj, 40)),
                 description: format!(
                     "You haven't replied to {} about \"{}\". Sent {}.",
-                    display, subj, &ts[..10.min(ts.len())]
+                    display,
+                    subj,
+                    &ts[..10.min(ts.len())]
                 ),
                 contact_email: Some(email),
                 confidence: 0.7,
-                context: Some(serde_json::json!({
-                    "thread_id": thread_id,
-                    "subject": subj,
-                    "timestamp": ts,
-                })
-                .to_string()),
+                context: Some(
+                    serde_json::json!({
+                        "thread_id": thread_id,
+                        "subject": subj,
+                        "timestamp": ts,
+                    })
+                    .to_string(),
+                ),
                 status: "pending".to_string(),
                 created_at: now.clone(),
                 acted_at: None,
@@ -1638,15 +1709,19 @@ pub fn detect_reachout_attempts() -> Result<Vec<Suggestion>, String> {
                 title: format!("{} has been trying to reach you", display),
                 description: format!(
                     "{} has sent {} unanswered emails in the last 7 days. Latest: {}.",
-                    display, count, &latest[..10.min(latest.len())]
+                    display,
+                    count,
+                    &latest[..10.min(latest.len())]
                 ),
                 contact_email: Some(email),
                 confidence: 0.85,
-                context: Some(serde_json::json!({
-                    "email_count": count,
-                    "latest": latest,
-                })
-                .to_string()),
+                context: Some(
+                    serde_json::json!({
+                        "email_count": count,
+                        "latest": latest,
+                    })
+                    .to_string(),
+                ),
                 status: "pending".to_string(),
                 created_at: now.clone(),
                 acted_at: None,
@@ -1982,8 +2057,7 @@ pub fn start_observer(app: AppHandle) {
 
         let mut calendar_interval =
             tokio::time::interval(tokio::time::Duration::from_secs(15 * 60));
-        let mut email_interval =
-            tokio::time::interval(tokio::time::Duration::from_secs(30 * 60));
+        let mut email_interval = tokio::time::interval(tokio::time::Duration::from_secs(30 * 60));
         let mut messaging_interval =
             tokio::time::interval(tokio::time::Duration::from_secs(20 * 60));
         let mut suggestion_interval =

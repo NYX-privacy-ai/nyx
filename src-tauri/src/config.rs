@@ -313,7 +313,7 @@ impl Default for CapabilitiesConfig {
             communications: true,
             source_intelligence: true,
             activity_intelligence: false, // opt-in — requires explicit enable
-            web_browsing: true, // on by default
+            web_browsing: true,           // on by default
             default_llm_provider: "anthropic".to_string(),
             ollama_model: None,
         }
@@ -450,7 +450,8 @@ pub fn read_current_config() -> Result<SettingsConfig, String> {
     // Read agent name from config.toml
     let config_path = home.join(".nyx/config.toml");
     let agent_name = if let Ok(content) = fs::read_to_string(&config_path) {
-        content.lines()
+        content
+            .lines()
             .find(|l| l.trim().starts_with("name") && l.contains('='))
             .and_then(|l| l.split('=').nth(1))
             .map(|v| v.trim().trim_matches('"').to_string())
@@ -464,29 +465,45 @@ pub fn read_current_config() -> Result<SettingsConfig, String> {
     let has_key = |k: &str| env.get(k).map_or(false, |v| !v.is_empty());
 
     // Default LLM provider
-    let default_llm_provider = env.get("DEFAULT_LLM_PROVIDER")
+    let default_llm_provider = env
+        .get("DEFAULT_LLM_PROVIDER")
         .cloned()
         .unwrap_or_else(|| "anthropic".to_string());
 
     // Guardrails
     let guardrails = GuardrailsConfig {
         preset: SecurityPreset::Custom, // When reading back, always treat as custom
-        max_transaction_usd: env.get("MAX_SINGLE_TX_USD")
-            .and_then(|v| v.parse().ok()).unwrap_or(500.0),
-        daily_loss_percent: env.get("DAILY_LOSS_LIMIT_PCT")
-            .and_then(|v| v.parse().ok()).unwrap_or(5.0),
-        weekly_loss_percent: env.get("WEEKLY_LOSS_LIMIT_PCT")
-            .and_then(|v| v.parse().ok()).unwrap_or(15.0),
-        daily_tx_limit: env.get("MAX_DAILY_TXS")
-            .and_then(|v| v.parse().ok()).unwrap_or(20),
-        require_confirmation: env.get("REQUIRE_CONFIRMATION")
+        max_transaction_usd: env
+            .get("MAX_SINGLE_TX_USD")
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(500.0),
+        daily_loss_percent: env
+            .get("DAILY_LOSS_LIMIT_PCT")
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(5.0),
+        weekly_loss_percent: env
+            .get("WEEKLY_LOSS_LIMIT_PCT")
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(15.0),
+        daily_tx_limit: env
+            .get("MAX_DAILY_TXS")
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(20),
+        require_confirmation: env
+            .get("REQUIRE_CONFIRMATION")
             .map_or(false, |v| v == "true"),
-        max_slippage_percent: env.get("MAX_SLIPPAGE_PCT")
-            .and_then(|v| v.parse().ok()).unwrap_or(2.0),
-        max_concentration_percent: env.get("MAX_CONCENTRATION_PCT")
-            .and_then(|v| v.parse().ok()).unwrap_or(40.0),
-        min_health_factor: env.get("BURROW_MIN_HEALTH_FACTOR")
-            .and_then(|v| v.parse().ok()).unwrap_or(1.5),
+        max_slippage_percent: env
+            .get("MAX_SLIPPAGE_PCT")
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(2.0),
+        max_concentration_percent: env
+            .get("MAX_CONCENTRATION_PCT")
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(40.0),
+        min_health_factor: env
+            .get("BURROW_MIN_HEALTH_FACTOR")
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(1.5),
     };
 
     // Messaging
@@ -494,7 +511,9 @@ pub fn read_current_config() -> Result<SettingsConfig, String> {
 
     let parse_autonomy = |k: &str| -> MessagingAutonomy {
         match env.get(k).map(|s| s.as_str()) {
-            Some("SendWithConfirm") | Some("send_with_confirm") => MessagingAutonomy::SendWithConfirm,
+            Some("SendWithConfirm") | Some("send_with_confirm") => {
+                MessagingAutonomy::SendWithConfirm
+            }
             Some("Autonomous") | Some("autonomous") => MessagingAutonomy::Autonomous,
             _ => MessagingAutonomy::DraftOnly,
         }
@@ -543,15 +562,11 @@ pub fn read_current_config() -> Result<SettingsConfig, String> {
             .map(|v| v == "true")
             .unwrap_or(true),
         default_llm_provider: default_llm_provider.clone(),
-        ollama_model: env.get("OLLAMA_MODEL")
-            .filter(|v| !v.is_empty())
-            .cloned(),
+        ollama_model: env.get("OLLAMA_MODEL").filter(|v| !v.is_empty()).cloned(),
     };
 
     // WhatsApp phone from env
-    let whatsapp_phone = env.get("WHATSAPP_PHONE")
-        .filter(|v| !v.is_empty())
-        .cloned();
+    let whatsapp_phone = env.get("WHATSAPP_PHONE").filter(|v| !v.is_empty()).cloned();
 
     Ok(SettingsConfig {
         agent_name,
@@ -618,7 +633,8 @@ fn read_email_config(home: &Path) -> EmailNotificationsConfig {
                                 let range = parts[1];
                                 if let Some(dash) = range.find('-') {
                                     config.triage_start_hour = range[..dash].parse().unwrap_or(8);
-                                    config.triage_end_hour = range[dash + 1..].parse().unwrap_or(22);
+                                    config.triage_end_hour =
+                                        range[dash + 1..].parse().unwrap_or(22);
                                 }
                             }
                         }
@@ -643,45 +659,96 @@ pub fn save_settings(update: SettingsUpdate) -> Result<SettingsSaveResult, Strin
     let mut restart_required = false;
 
     // Determine final values by merging update with existing
-    let agent_name = update.agent_name.clone().unwrap_or(existing.agent_name.clone());
+    let agent_name = update
+        .agent_name
+        .clone()
+        .unwrap_or(existing.agent_name.clone());
     if update.agent_name.is_some() && update.agent_name.as_deref() != Some(&existing.agent_name) {
         restart_required = true;
     }
 
     // API keys: None = preserve, Some("") = clear, Some(val) = new
     let anthropic_key = match &update.anthropic_key {
-        Some(k) => { restart_required = true; k.clone() }
+        Some(k) => {
+            restart_required = true;
+            k.clone()
+        }
         None => env.get("ANTHROPIC_API_KEY").cloned().unwrap_or_default(),
     };
     let openai_key = match &update.openai_key {
-        Some(k) if !k.is_empty() => { restart_required = true; Some(k.clone()) }
-        Some(_) => { restart_required = true; None }
+        Some(k) if !k.is_empty() => {
+            restart_required = true;
+            Some(k.clone())
+        }
+        Some(_) => {
+            restart_required = true;
+            None
+        }
         None => env.get("OPENAI_API_KEY").filter(|v| !v.is_empty()).cloned(),
     };
     let venice_key = match &update.venice_key {
-        Some(k) if !k.is_empty() => { restart_required = true; Some(k.clone()) }
-        Some(_) => { restart_required = true; None }
+        Some(k) if !k.is_empty() => {
+            restart_required = true;
+            Some(k.clone())
+        }
+        Some(_) => {
+            restart_required = true;
+            None
+        }
         None => env.get("VENICE_API_KEY").filter(|v| !v.is_empty()).cloned(),
     };
     let nearai_key = match &update.nearai_key {
-        Some(k) if !k.is_empty() => { restart_required = true; Some(k.clone()) }
-        Some(_) => { restart_required = true; None }
+        Some(k) if !k.is_empty() => {
+            restart_required = true;
+            Some(k.clone())
+        }
+        Some(_) => {
+            restart_required = true;
+            None
+        }
         None => env.get("NEARAI_API_KEY").filter(|v| !v.is_empty()).cloned(),
     };
     let perplexity_key = match &update.perplexity_key {
-        Some(k) if !k.is_empty() => { restart_required = true; Some(k.clone()) }
-        Some(_) => { restart_required = true; None }
-        None => env.get("PERPLEXITY_API_KEY").filter(|v| !v.is_empty()).cloned(),
+        Some(k) if !k.is_empty() => {
+            restart_required = true;
+            Some(k.clone())
+        }
+        Some(_) => {
+            restart_required = true;
+            None
+        }
+        None => env
+            .get("PERPLEXITY_API_KEY")
+            .filter(|v| !v.is_empty())
+            .cloned(),
     };
     let telegram_token = match &update.telegram_token {
-        Some(t) if !t.is_empty() => { restart_required = true; Some(t.clone()) }
-        Some(_) => { restart_required = true; None }
-        None => env.get("TELEGRAM_BOT_TOKEN").filter(|v| !v.is_empty()).cloned(),
+        Some(t) if !t.is_empty() => {
+            restart_required = true;
+            Some(t.clone())
+        }
+        Some(_) => {
+            restart_required = true;
+            None
+        }
+        None => env
+            .get("TELEGRAM_BOT_TOKEN")
+            .filter(|v| !v.is_empty())
+            .cloned(),
     };
     let slack_token = match &update.slack_token {
-        Some(t) if !t.is_empty() => { restart_required = true; Some(t.clone()) }
-        Some(_) => { restart_required = true; None }
-        None => env.get("SLACK_BOT_TOKEN").filter(|v| !v.is_empty()).cloned(),
+        Some(t) if !t.is_empty() => {
+            restart_required = true;
+            Some(t.clone())
+        }
+        Some(_) => {
+            restart_required = true;
+            None
+        }
+        None => env
+            .get("SLACK_BOT_TOKEN")
+            .filter(|v| !v.is_empty())
+            .cloned(),
     };
     let whatsapp_phone = match &update.whatsapp_phone {
         Some(p) if !p.is_empty() => Some(p.clone()),
@@ -689,30 +756,52 @@ pub fn save_settings(update: SettingsUpdate) -> Result<SettingsSaveResult, Strin
         None => existing.whatsapp_phone.clone(),
     };
 
-    let guardrails = update.guardrails.clone().unwrap_or(existing.guardrails.clone());
-    if update.guardrails.is_some() { restart_required = true; }
+    let guardrails = update
+        .guardrails
+        .clone()
+        .unwrap_or(existing.guardrails.clone());
+    if update.guardrails.is_some() {
+        restart_required = true;
+    }
 
-    let messaging = update.messaging.clone().unwrap_or(existing.messaging.clone());
-    if update.messaging.is_some() { restart_required = true; }
+    let messaging = update
+        .messaging
+        .clone()
+        .unwrap_or(existing.messaging.clone());
+    if update.messaging.is_some() {
+        restart_required = true;
+    }
 
-    let email_notifications = update.email_notifications.clone()
+    let email_notifications = update
+        .email_notifications
+        .clone()
         .unwrap_or(existing.email_notifications.clone());
 
-    let capabilities = update.capabilities.clone().unwrap_or(existing.capabilities.clone());
-    if update.capabilities.is_some() { restart_required = true; }
+    let capabilities = update
+        .capabilities
+        .clone()
+        .unwrap_or(existing.capabilities.clone());
+    if update.capabilities.is_some() {
+        restart_required = true;
+    }
 
     // Preserve gateway token from existing env
-    let gateway_token = env.get("GATEWAY_AUTH_TOKEN")
+    let gateway_token = env
+        .get("GATEWAY_AUTH_TOKEN")
         .cloned()
         .unwrap_or_else(generate_token);
 
     // Reconstruct wallets from existing env
-    let wallet_count: usize = env.get("WALLET_COUNT")
-        .and_then(|v| v.parse().ok()).unwrap_or(0);
+    let wallet_count: usize = env
+        .get("WALLET_COUNT")
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(0);
     let mut wallets = Vec::new();
     for i in 0..wallet_count {
-        let chain_str = env.get(&format!("WALLET_{}_CHAIN", i))
-            .cloned().unwrap_or_default();
+        let chain_str = env
+            .get(&format!("WALLET_{}_CHAIN", i))
+            .cloned()
+            .unwrap_or_default();
         let chain = match chain_str.as_str() {
             "near" => Chain::NEAR,
             "eth" => Chain::ETH,
@@ -724,10 +813,17 @@ pub fn save_settings(update: SettingsUpdate) -> Result<SettingsSaveResult, Strin
         wallets.push(WalletConfig {
             id: format!("wallet_{}", i),
             chain,
-            address: env.get(&format!("WALLET_{}_ADDRESS", i)).cloned().unwrap_or_default(),
-            label: env.get(&format!("WALLET_{}_LABEL", i)).cloned().unwrap_or_default(),
+            address: env
+                .get(&format!("WALLET_{}_ADDRESS", i))
+                .cloned()
+                .unwrap_or_default(),
+            label: env
+                .get(&format!("WALLET_{}_LABEL", i))
+                .cloned()
+                .unwrap_or_default(),
             has_private_key: true,
-            is_active: env.get(&format!("WALLET_{}_ACTIVE", i))
+            is_active: env
+                .get(&format!("WALLET_{}_ACTIVE", i))
                 .map_or(false, |v| v == "true"),
         });
     }
@@ -793,11 +889,16 @@ pub fn get_zec_address() -> Option<String> {
     let env_path = home.join(".nyx/.env");
     let env = parse_env_file(&env_path).ok()?;
 
-    let wallet_count: usize = env.get("WALLET_COUNT")
-        .and_then(|v| v.parse().ok()).unwrap_or(0);
+    let wallet_count: usize = env
+        .get("WALLET_COUNT")
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(0);
 
     for i in 0..wallet_count {
-        let chain = env.get(&format!("WALLET_{}_CHAIN", i)).cloned().unwrap_or_default();
+        let chain = env
+            .get(&format!("WALLET_{}_CHAIN", i))
+            .cloned()
+            .unwrap_or_default();
         if chain == "zec" {
             if let Some(addr) = env.get(&format!("WALLET_{}_ADDRESS", i)) {
                 if !addr.is_empty() {
@@ -823,11 +924,16 @@ pub fn get_near_account() -> Option<String> {
     }
 
     // Fall back to first NEAR wallet address
-    let wallet_count: usize = env.get("WALLET_COUNT")
-        .and_then(|v| v.parse().ok()).unwrap_or(0);
+    let wallet_count: usize = env
+        .get("WALLET_COUNT")
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(0);
 
     for i in 0..wallet_count {
-        let chain = env.get(&format!("WALLET_{}_CHAIN", i)).cloned().unwrap_or_default();
+        let chain = env
+            .get(&format!("WALLET_{}_CHAIN", i))
+            .cloned()
+            .unwrap_or_default();
         if chain == "near" {
             if let Some(addr) = env.get(&format!("WALLET_{}_ADDRESS", i)) {
                 if !addr.is_empty() {
@@ -889,7 +995,8 @@ pub fn write_nyx_env(config: &SetupConfig) -> Result<(), String> {
     // available port (avoids collision with other IronClaw instances like Atlas).
     let gateway_port = {
         let existing = if let Ok(contents) = fs::read_to_string(&path) {
-            contents.lines()
+            contents
+                .lines()
                 .find(|l| l.starts_with("GATEWAY_PORT="))
                 .and_then(|l| l.strip_prefix("GATEWAY_PORT="))
                 .and_then(|v| v.trim().parse::<u16>().ok())
@@ -907,7 +1014,10 @@ pub fn write_nyx_env(config: &SetupConfig) -> Result<(), String> {
          DATABASE_BACKEND=libsql\n\
          LIBSQL_PATH={}/.nyx/ironclaw.db\n\
          GATEWAY_PORT={}\n",
-        config.gateway_token, config.anthropic_key, home.display(), gateway_port
+        config.gateway_token,
+        config.anthropic_key,
+        home.display(),
+        gateway_port
     );
 
     if let Some(ref key) = config.openai_key {
@@ -971,7 +1081,9 @@ pub fn write_nyx_env(config: &SetupConfig) -> Result<(), String> {
 
     // NEAR credentials — injected as env vars (IronClaw boundary injection)
     // Find the active NEAR wallet and write account ID + private key path
-    let active_near = config.wallets.iter()
+    let active_near = config
+        .wallets
+        .iter()
         .find(|w| matches!(w.chain, Chain::NEAR) && w.is_active);
     if let Some(near_wallet) = active_near {
         content.push_str(&format!(
@@ -1017,11 +1129,16 @@ pub fn write_nyx_env(config: &SetupConfig) -> Result<(), String> {
          CAPABILITY_WEB_BROWSING={}\n\
          DEFAULT_LLM_PROVIDER={}\n\
          OLLAMA_MODEL={}\n",
-        m.gmail.enabled, m.gmail.autonomy,
-        m.whatsapp.enabled, m.whatsapp.autonomy,
-        m.telegram.enabled, m.telegram.autonomy,
-        m.slack.enabled, m.slack.autonomy,
-        m.signal.enabled, m.signal.autonomy,
+        m.gmail.enabled,
+        m.gmail.autonomy,
+        m.whatsapp.enabled,
+        m.whatsapp.autonomy,
+        m.telegram.enabled,
+        m.telegram.autonomy,
+        m.slack.enabled,
+        m.slack.autonomy,
+        m.signal.enabled,
+        m.signal.autonomy,
         config.google_authenticated,
         caps.defi_crypto,
         caps.travel,
@@ -1039,8 +1156,7 @@ pub fn write_nyx_env(config: &SetupConfig) -> Result<(), String> {
     if let Some(parent) = path.parent() {
         let _ = fs::create_dir_all(parent);
     }
-    fs::write(&path, content)
-        .map_err(|e| format!("Failed to write .env: {}", e))?;
+    fs::write(&path, content).map_err(|e| format!("Failed to write .env: {}", e))?;
 
     #[cfg(unix)]
     {
@@ -1137,8 +1253,7 @@ dedup_threshold = 0.85
     if let Some(parent) = path.parent() {
         let _ = fs::create_dir_all(parent);
     }
-    fs::write(&path, content)
-        .map_err(|e| format!("Failed to write config.toml: {}", e))?;
+    fs::write(&path, content).map_err(|e| format!("Failed to write config.toml: {}", e))?;
 
     Ok(())
 }
@@ -1181,8 +1296,7 @@ pub fn write_guardrails(guardrails: &GuardrailsConfig) -> Result<(), String> {
         guardrails.require_confirmation,
     );
 
-    fs::write(&path, content)
-        .map_err(|e| format!("Failed to write guardrails: {}", e))?;
+    fs::write(&path, content).map_err(|e| format!("Failed to write guardrails: {}", e))?;
 
     #[cfg(unix)]
     {
@@ -1330,8 +1444,7 @@ pub fn write_cron_jobs(config: &SetupConfig) -> Result<(), String> {
 
     let content = serde_json::to_string_pretty(&jobs)
         .map_err(|e| format!("Failed to serialize cron jobs: {}", e))?;
-    fs::write(&path, content)
-        .map_err(|e| format!("Failed to write cron jobs: {}", e))?;
+    fs::write(&path, content).map_err(|e| format!("Failed to write cron jobs: {}", e))?;
 
     Ok(())
 }
@@ -1581,8 +1694,7 @@ pub fn copy_resources(resources_dir: &Path) -> Result<(), String> {
     let gog_src = resources_dir.join("bin/gog");
     let gog_dst = home.join(".nyx/bin/gog");
     if gog_src.exists() {
-        fs::copy(&gog_src, &gog_dst)
-            .map_err(|e| format!("Failed to copy gog: {}", e))?;
+        fs::copy(&gog_src, &gog_dst).map_err(|e| format!("Failed to copy gog: {}", e))?;
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
@@ -1595,8 +1707,7 @@ pub fn copy_resources(resources_dir: &Path) -> Result<(), String> {
     let jq_src = resources_dir.join("bin/jq");
     let jq_dst = home.join(".nyx/bin/jq");
     if jq_src.exists() {
-        fs::copy(&jq_src, &jq_dst)
-            .map_err(|e| format!("Failed to copy jq: {}", e))?;
+        fs::copy(&jq_src, &jq_dst).map_err(|e| format!("Failed to copy jq: {}", e))?;
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
@@ -1612,11 +1723,10 @@ fn copy_dir_contents(src: &Path, dst: &Path) -> Result<(), String> {
     if !src.exists() {
         return Ok(());
     }
-    fs::create_dir_all(dst)
-        .map_err(|e| format!("Failed to create {}: {}", dst.display(), e))?;
+    fs::create_dir_all(dst).map_err(|e| format!("Failed to create {}: {}", dst.display(), e))?;
 
-    for entry in fs::read_dir(src)
-        .map_err(|e| format!("Failed to read {}: {}", src.display(), e))?
+    for entry in
+        fs::read_dir(src).map_err(|e| format!("Failed to read {}: {}", src.display(), e))?
     {
         let entry = entry.map_err(|e| format!("Dir entry error: {}", e))?;
         let src_path = entry.path();

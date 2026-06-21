@@ -22,9 +22,9 @@ pub struct KnowledgeEntry {
     pub title: String,
     pub content: String,
     pub tags: Vec<String>,
-    pub category: String,     // entity | concept | document | note | meeting | project
-    pub source: Option<String>,       // chat | email | calendar | manual | document | web
-    pub source_ref: Option<String>,   // e.g. session_id, email thread, URL
+    pub category: String, // entity | concept | document | note | meeting | project
+    pub source: Option<String>, // chat | email | calendar | manual | document | web
+    pub source_ref: Option<String>, // e.g. session_id, email thread, URL
     pub related_ids: Vec<i64>,
     pub created_at: String,
     pub updated_at: String,
@@ -153,11 +153,16 @@ fn row_to_entry(row: &rusqlite::Row) -> rusqlite::Result<KnowledgeEntry> {
 // CRUD
 // ---------------------------------------------------------------------------
 
-pub fn list_entries(category_filter: Option<&str>, limit: Option<u32>) -> Result<Vec<KnowledgeEntry>, String> {
+pub fn list_entries(
+    category_filter: Option<&str>,
+    limit: Option<u32>,
+) -> Result<Vec<KnowledgeEntry>, String> {
     let conn = intelligence::open_db_pub()?;
     let lim = limit.unwrap_or(100);
 
-    let (query, params_vec): (String, Vec<Box<dyn rusqlite::types::ToSql>>) = if let Some(cat) = category_filter {
+    let (query, params_vec): (String, Vec<Box<dyn rusqlite::types::ToSql>>) = if let Some(cat) =
+        category_filter
+    {
         (
             "SELECT id, title, content, tags, category, source, source_ref, related_ids, created_at, updated_at FROM knowledge WHERE category = ?1 ORDER BY updated_at DESC LIMIT ?2".to_string(),
             vec![Box::new(cat.to_string()), Box::new(lim)],
@@ -169,9 +174,12 @@ pub fn list_entries(category_filter: Option<&str>, limit: Option<u32>) -> Result
         )
     };
 
-    let params_refs: Vec<&dyn rusqlite::types::ToSql> = params_vec.iter().map(|p| p.as_ref()).collect();
+    let params_refs: Vec<&dyn rusqlite::types::ToSql> =
+        params_vec.iter().map(|p| p.as_ref()).collect();
     let mut stmt = conn.prepare(&query).map_err(|e| e.to_string())?;
-    let rows = stmt.query_map(params_refs.as_slice(), row_to_entry).map_err(|e| e.to_string())?;
+    let rows = stmt
+        .query_map(params_refs.as_slice(), row_to_entry)
+        .map_err(|e| e.to_string())?;
 
     let mut entries = vec![];
     for row in rows {
@@ -193,7 +201,9 @@ pub fn search_entries(query: &str) -> Result<Vec<KnowledgeEntry>, String> {
         )
         .map_err(|e| e.to_string())?;
 
-    let rows = stmt.query_map(params![query], row_to_entry).map_err(|e| e.to_string())?;
+    let rows = stmt
+        .query_map(params![query], row_to_entry)
+        .map_err(|e| e.to_string())?;
     let mut entries = vec![];
     for row in rows {
         entries.push(row.map_err(|e| e.to_string())?);
@@ -214,9 +224,11 @@ pub fn get_entry(id: i64) -> Result<KnowledgeEntry, String> {
 pub fn create_entry(input: CreateKnowledgeInput) -> Result<KnowledgeEntry, String> {
     let conn = intelligence::open_db_pub()?;
     let now = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
-    let tags = serde_json::to_string(&input.tags.unwrap_or_default()).unwrap_or_else(|_| "[]".to_string());
+    let tags =
+        serde_json::to_string(&input.tags.unwrap_or_default()).unwrap_or_else(|_| "[]".to_string());
     let category = input.category.unwrap_or_else(|| "note".to_string());
-    let related = serde_json::to_string(&input.related_ids.unwrap_or_default()).unwrap_or_else(|_| "[]".to_string());
+    let related = serde_json::to_string(&input.related_ids.unwrap_or_default())
+        .unwrap_or_else(|_| "[]".to_string());
 
     conn.execute(
         "INSERT INTO knowledge (title, content, tags, category, source, source_ref, related_ids, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
@@ -260,10 +272,16 @@ pub fn update_entry(id: i64, input: UpdateKnowledgeInput) -> Result<KnowledgeEnt
     let _ = param_idx;
 
     params_vec.push(Box::new(id));
-    let query = format!("UPDATE knowledge SET {} WHERE id = ?{}", sets.join(", "), params_vec.len());
+    let query = format!(
+        "UPDATE knowledge SET {} WHERE id = ?{}",
+        sets.join(", "),
+        params_vec.len()
+    );
 
-    let params_refs: Vec<&dyn rusqlite::types::ToSql> = params_vec.iter().map(|p| p.as_ref()).collect();
-    conn.execute(&query, params_refs.as_slice()).map_err(|e| e.to_string())?;
+    let params_refs: Vec<&dyn rusqlite::types::ToSql> =
+        params_vec.iter().map(|p| p.as_ref()).collect();
+    conn.execute(&query, params_refs.as_slice())
+        .map_err(|e| e.to_string())?;
 
     get_entry(id)
 }
@@ -292,7 +310,9 @@ pub fn get_knowledge_stats() -> Result<KnowledgeStats, String> {
 
     // Categories
     let mut stmt = conn
-        .prepare("SELECT category, COUNT(*) FROM knowledge GROUP BY category ORDER BY COUNT(*) DESC")
+        .prepare(
+            "SELECT category, COUNT(*) FROM knowledge GROUP BY category ORDER BY COUNT(*) DESC",
+        )
         .map_err(|e| e.to_string())?;
     let categories: Vec<CategoryCount> = stmt
         .query_map([], |r| {

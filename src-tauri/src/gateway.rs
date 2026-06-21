@@ -41,9 +41,21 @@ impl Default for ChatFolders {
     fn default() -> Self {
         Self {
             folders: vec![
-                ChatFolder { id: "general".into(), name: "General".into(), order: 0 },
-                ChatFolder { id: "work".into(), name: "Work".into(), order: 1 },
-                ChatFolder { id: "research".into(), name: "Research".into(), order: 2 },
+                ChatFolder {
+                    id: "general".into(),
+                    name: "General".into(),
+                    order: 0,
+                },
+                ChatFolder {
+                    id: "work".into(),
+                    name: "Work".into(),
+                    order: 1,
+                },
+                ChatFolder {
+                    id: "research".into(),
+                    name: "Research".into(),
+                    order: 2,
+                },
             ],
             session_folders: HashMap::new(),
             session_titles: HashMap::new(),
@@ -69,8 +81,7 @@ fn sessions_db_path() -> PathBuf {
 
 fn open_sessions_db() -> Result<Connection, String> {
     let path = sessions_db_path();
-    let conn = Connection::open(&path)
-        .map_err(|e| format!("Failed to open sessions DB: {}", e))?;
+    let conn = Connection::open(&path).map_err(|e| format!("Failed to open sessions DB: {}", e))?;
     conn.execute_batch(
         "CREATE TABLE IF NOT EXISTS sessions (
             id TEXT PRIMARY KEY,
@@ -100,8 +111,8 @@ fn open_sessions_db() -> Result<Connection, String> {
 fn read_gateway_token() -> Result<String, String> {
     let env_path = ironclaw::config_dir().join(".env");
 
-    let content = fs::read_to_string(&env_path)
-        .map_err(|e| format!("Failed to read .env: {}", e))?;
+    let content =
+        fs::read_to_string(&env_path).map_err(|e| format!("Failed to read .env: {}", e))?;
 
     for line in content.lines() {
         if let Some(val) = line.strip_prefix("GATEWAY_AUTH_TOKEN=") {
@@ -145,8 +156,7 @@ fn save_folders(folders: &ChatFolders) -> Result<(), String> {
     }
     let content = serde_json::to_string_pretty(folders)
         .map_err(|e| format!("Failed to serialize folders: {}", e))?;
-    fs::write(&path, content)
-        .map_err(|e| format!("Failed to write folders: {}", e))
+    fs::write(&path, content).map_err(|e| format!("Failed to write folders: {}", e))
 }
 
 // ---------------------------------------------------------------------------
@@ -160,7 +170,10 @@ pub async fn send_message(message: String) -> Result<String, String> {
 
 /// Send a message to a specific session. Includes conversation history
 /// in the request (IronClaw gateway is stateless).
-pub async fn send_message_to_session(message: String, session_key: String) -> Result<String, String> {
+pub async fn send_message_to_session(
+    message: String,
+    session_key: String,
+) -> Result<String, String> {
     let token = read_gateway_token()?;
     let port = ironclaw::gateway_port();
     let url = format!("http://127.0.0.1:{}/v1/chat/completions", port);
@@ -175,15 +188,18 @@ pub async fn send_message_to_session(message: String, session_key: String) -> Re
         db.execute(
             "INSERT OR IGNORE INTO sessions (id, title) VALUES (?1, ?1)",
             rusqlite::params![&session_key],
-        ).map_err(|e| format!("DB error: {}", e))?;
+        )
+        .map_err(|e| format!("DB error: {}", e))?;
 
         // Load history — cap at 40 messages (20 pairs) to prevent context poisoning
-        let mut stmt = db.prepare(
-            "SELECT role, content FROM (
+        let mut stmt = db
+            .prepare(
+                "SELECT role, content FROM (
                 SELECT role, content, created_at FROM messages WHERE session_id = ?1
                 ORDER BY created_at DESC LIMIT 40
-            ) ORDER BY created_at ASC"
-        ).map_err(|e| format!("DB error: {}", e))?;
+            ) ORDER BY created_at ASC",
+            )
+            .map_err(|e| format!("DB error: {}", e))?;
 
         let history: Vec<serde_json::Value> = stmt
             .query_map(rusqlite::params![&session_key], |row| {
@@ -203,7 +219,8 @@ pub async fn send_message_to_session(message: String, session_key: String) -> Re
         db.execute(
             "INSERT INTO messages (session_id, role, content) VALUES (?1, 'user', ?2)",
             rusqlite::params![&session_key, &message],
-        ).map_err(|e| format!("DB error: {}", e))?;
+        )
+        .map_err(|e| format!("DB error: {}", e))?;
 
         serde_json::json!({
             "model": "default",
@@ -280,19 +297,20 @@ pub fn list_sessions() -> Result<Vec<SessionInfo>, String> {
         })
         .map_err(|e| format!("DB error: {}", e))?
         .filter_map(|r| r.ok())
-        .map(|(id, title, updated_at)| {
-            SessionInfo {
-                session_key: id.clone(),
-                session_id: Some(id.clone()),
-                updated_at,
-                input_tokens: None,
-                output_tokens: None,
-                total_tokens: None,
-                model: None,
-                title: folders_data.session_titles.get(&id).cloned()
-                    .or(Some(title)),
-                folder: folders_data.session_folders.get(&id).cloned(),
-            }
+        .map(|(id, title, updated_at)| SessionInfo {
+            session_key: id.clone(),
+            session_id: Some(id.clone()),
+            updated_at,
+            input_tokens: None,
+            output_tokens: None,
+            total_tokens: None,
+            model: None,
+            title: folders_data
+                .session_titles
+                .get(&id)
+                .cloned()
+                .or(Some(title)),
+            folder: folders_data.session_folders.get(&id).cloned(),
         })
         .collect();
 
@@ -309,7 +327,8 @@ pub fn create_session(title: Option<String>, folder: Option<String>) -> Result<S
     db.execute(
         "INSERT INTO sessions (id, title) VALUES (?1, ?2)",
         rusqlite::params![&session_key, &display_title],
-    ).map_err(|e| format!("DB error: {}", e))?;
+    )
+    .map_err(|e| format!("DB error: {}", e))?;
 
     let mut folders_data = load_folders();
     if let Some(t) = title {
@@ -329,7 +348,8 @@ pub fn rename_session(session_key: String, title: String) -> Result<(), String> 
     db.execute(
         "UPDATE sessions SET title = ?2 WHERE id = ?1",
         rusqlite::params![&session_key, &title],
-    ).map_err(|e| format!("DB error: {}", e))?;
+    )
+    .map_err(|e| format!("DB error: {}", e))?;
 
     let mut folders_data = load_folders();
     folders_data.session_titles.insert(session_key, title);
@@ -337,11 +357,18 @@ pub fn rename_session(session_key: String, title: String) -> Result<(), String> 
 }
 
 /// Move a session to a different folder.
-pub fn move_session_to_folder(session_key: String, folder_id: Option<String>) -> Result<(), String> {
+pub fn move_session_to_folder(
+    session_key: String,
+    folder_id: Option<String>,
+) -> Result<(), String> {
     let mut folders_data = load_folders();
     match folder_id {
-        Some(f) => { folders_data.session_folders.insert(session_key, f); }
-        None => { folders_data.session_folders.remove(&session_key); }
+        Some(f) => {
+            folders_data.session_folders.insert(session_key, f);
+        }
+        None => {
+            folders_data.session_folders.remove(&session_key);
+        }
     }
     save_folders(&folders_data)
 }
@@ -356,7 +383,11 @@ pub fn create_folder(name: String) -> Result<ChatFolder, String> {
     let mut data = load_folders();
     let id = name.to_lowercase().replace(' ', "_");
     let order = data.folders.len() as u32;
-    let folder = ChatFolder { id: id.clone(), name, order };
+    let folder = ChatFolder {
+        id: id.clone(),
+        name,
+        order,
+    };
     data.folders.push(folder.clone());
     save_folders(&data)?;
     Ok(folder)
@@ -473,12 +504,14 @@ pub fn load_session_history(
 ) -> Result<Vec<HistoryMessage>, String> {
     let db = open_sessions_db()?;
 
-    let mut stmt = db.prepare(
-        "SELECT role, content FROM messages
+    let mut stmt = db
+        .prepare(
+            "SELECT role, content FROM messages
          WHERE session_id = ?1
          ORDER BY created_at DESC
-         LIMIT ?2"
-    ).map_err(|e| format!("DB error: {}", e))?;
+         LIMIT ?2",
+        )
+        .map_err(|e| format!("DB error: {}", e))?;
 
     let mut messages: Vec<HistoryMessage> = stmt
         .query_map(rusqlite::params![session_key, limit as i64], |row| {

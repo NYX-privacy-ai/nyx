@@ -12,9 +12,7 @@ pub struct DockerCheck {
 /// Detailed Docker status: installed, running, version, download link.
 pub async fn check_docker_detailed() -> Result<DockerCheck, String> {
     // Check if docker binary exists
-    let version_output = Command::new("docker")
-        .args(["--version"])
-        .output();
+    let version_output = Command::new("docker").args(["--version"]).output();
 
     let (installed, version) = match version_output {
         Ok(out) if out.status.success() => {
@@ -76,7 +74,14 @@ pub async fn start_container() -> Result<(), String> {
     let compose_file = format!("{}/openclaw/docker-compose.yml", home);
 
     let output = Command::new("docker")
-        .args(["compose", "-f", &compose_file, "up", "-d", "openclaw-gateway"])
+        .args([
+            "compose",
+            "-f",
+            &compose_file,
+            "up",
+            "-d",
+            "openclaw-gateway",
+        ])
         .output()
         .map_err(|e| format!("Failed to start container: {}", e))?;
 
@@ -109,7 +114,13 @@ pub async fn stop_container() -> Result<(), String> {
 /// Get container status.
 pub async fn container_status() -> Result<String, String> {
     let output = Command::new("docker")
-        .args(["ps", "--filter", "name=openclaw-gateway", "--format", "{{.Status}}"])
+        .args([
+            "ps",
+            "--filter",
+            "name=openclaw-gateway",
+            "--format",
+            "{{.Status}}",
+        ])
         .output()
         .map_err(|e| format!("Failed to check status: {}", e))?;
 
@@ -170,7 +181,11 @@ pub async fn install_docker() -> Result<String, String> {
 
     // 3. Copy Docker.app to /Applications
     let output = Command::new("cp")
-        .args(["-R", &format!("{}/Docker.app", mount_point), "/Applications/Docker.app"])
+        .args([
+            "-R",
+            &format!("{}/Docker.app", mount_point),
+            "/Applications/Docker.app",
+        ])
         .output()
         .map_err(|e| format!("Failed to copy Docker.app: {}", e))?;
 

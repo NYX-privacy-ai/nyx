@@ -65,10 +65,9 @@ pub fn check_status() -> Result<ClawdTalkStatus, String> {
             // Resolve env vars from .env
             let resolved = resolve_env_vars(&content);
             if let Ok(cfg) = serde_json::from_str::<serde_json::Value>(&resolved) {
-                let key = cfg.get("api_key")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("");
-                has_api_key = !key.is_empty() && key != "YOUR_API_KEY_HERE" && !key.starts_with("${");
+                let key = cfg.get("api_key").and_then(|v| v.as_str()).unwrap_or("");
+                has_api_key =
+                    !key.is_empty() && key != "YOUR_API_KEY_HERE" && !key.starts_with("${");
                 if let Some(s) = cfg.get("server").and_then(|v| v.as_str()) {
                     server = s.to_string();
                 }
@@ -119,10 +118,13 @@ fn check_process_running() -> (bool, Option<u32>) {
 /// Write ClawdTalk skill-config.json with the actual API key value.
 /// Shell scripts (call.sh, sms.sh etc.) read this via jq and cannot resolve
 /// env var references, so the raw key must be written directly.
-pub fn write_config(api_key_ref: &str, owner_name: Option<&str>, agent_name: Option<&str>) -> Result<(), String> {
+pub fn write_config(
+    api_key_ref: &str,
+    owner_name: Option<&str>,
+    agent_name: Option<&str>,
+) -> Result<(), String> {
     let dir = skill_dir();
-    fs::create_dir_all(&dir)
-        .map_err(|e| format!("Failed to create ClawdTalk dir: {}", e))?;
+    fs::create_dir_all(&dir).map_err(|e| format!("Failed to create ClawdTalk dir: {}", e))?;
 
     // Build greeting
     let greeting = match owner_name {
@@ -141,8 +143,7 @@ pub fn write_config(api_key_ref: &str, owner_name: Option<&str>, agent_name: Opt
 
     let content = serde_json::to_string_pretty(&config)
         .map_err(|e| format!("Failed to serialize config: {}", e))?;
-    fs::write(config_path(), content)
-        .map_err(|e| format!("Failed to write config: {}", e))?;
+    fs::write(config_path(), content).map_err(|e| format!("Failed to write config: {}", e))?;
 
     // chmod 600 on config file (contains API key)
     #[cfg(unix)]
@@ -161,8 +162,7 @@ pub fn remove_config() -> Result<(), String> {
     // Remove config file
     let config = config_path();
     if config.exists() {
-        fs::remove_file(&config)
-            .map_err(|e| format!("Failed to remove config: {}", e))?;
+        fs::remove_file(&config).map_err(|e| format!("Failed to remove config: {}", e))?;
     }
     Ok(())
 }
@@ -196,7 +196,10 @@ pub async fn start_connection() -> Result<ClawdTalkStatus, String> {
             .output();
         if let Ok(o) = install {
             if !o.status.success() {
-                return Err("Failed to install ClawdTalk npm dependencies. Ensure npm is available.".to_string());
+                return Err(
+                    "Failed to install ClawdTalk npm dependencies. Ensure npm is available."
+                        .to_string(),
+                );
             }
         } else {
             return Err("npm not found. Install Node.js to use voice calling.".to_string());
@@ -230,7 +233,8 @@ pub async fn start_connection() -> Result<ClawdTalkStatus, String> {
         .open(&log)
         .map_err(|e| format!("Failed to open log file: {}", e))?;
 
-    let log_err = log_handle.try_clone()
+    let log_err = log_handle
+        .try_clone()
         .map_err(|e| format!("Failed to clone log handle: {}", e))?;
 
     let mut cmd = std::process::Command::new("node");
@@ -244,7 +248,8 @@ pub async fn start_connection() -> Result<ClawdTalkStatus, String> {
         cmd.env(key, value);
     }
 
-    let child = cmd.spawn()
+    let child = cmd
+        .spawn()
         .map_err(|e| format!("Failed to start ClawdTalk: {}", e))?;
 
     let pid = child.id();
@@ -284,10 +289,13 @@ pub fn get_logs(lines: usize) -> Result<Vec<String>, String> {
     if !log.exists() {
         return Ok(vec![]);
     }
-    let content = fs::read_to_string(&log)
-        .map_err(|e| format!("Failed to read log: {}", e))?;
+    let content = fs::read_to_string(&log).map_err(|e| format!("Failed to read log: {}", e))?;
     let all_lines: Vec<String> = content.lines().map(|l| l.to_string()).collect();
-    let start = if all_lines.len() > lines { all_lines.len() - lines } else { 0 };
+    let start = if all_lines.len() > lines {
+        all_lines.len() - lines
+    } else {
+        0
+    };
     Ok(all_lines[start..].to_vec())
 }
 

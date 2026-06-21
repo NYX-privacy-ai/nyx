@@ -149,9 +149,7 @@ pub async fn run_setup_v2(
     config::create_directories()?;
 
     // Step 2: Write config files
-    let active_id = active_wallet_id.or_else(|| {
-        wallets.first().map(|w| w.id.clone())
-    });
+    let active_id = active_wallet_id.or_else(|| wallets.first().map(|w| w.id.clone()));
 
     let setup_config = config::SetupConfig {
         agent_name: agent_name.clone(),
@@ -316,8 +314,7 @@ fn write_launch_agent() -> Result<(), String> {
     );
 
     let path = plist_dir.join("com.nyx.daemon.plist");
-    std::fs::write(&path, plist)
-        .map_err(|e| format!("Failed to write LaunchAgent: {}", e))?;
+    std::fs::write(&path, plist).map_err(|e| format!("Failed to write LaunchAgent: {}", e))?;
 
     Ok(())
 }

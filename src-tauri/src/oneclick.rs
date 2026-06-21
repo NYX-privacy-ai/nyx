@@ -104,7 +104,7 @@ fn deadline_10min() -> String {
         .unwrap_or_default()
         .as_secs();
     let future = now + 600; // 10 minutes
-    // Format as ISO 8601: YYYY-MM-DDTHH:MM:SS.000Z
+                            // Format as ISO 8601: YYYY-MM-DDTHH:MM:SS.000Z
     let secs_per_day = 86400u64;
     let secs_per_hour = 3600u64;
     let secs_per_min = 60u64;
@@ -398,8 +398,14 @@ pub fn resolve_asset_id(chain: &str, symbol: &str) -> Result<String, String> {
     let known: HashMap<&str, &str> = HashMap::from([
         ("near:NEAR", "nep141:wrap.near"),
         ("near:WNEAR", "nep141:wrap.near"),
-        ("near:USDC", "nep141:a0b86991c6218b36c1d19d4a2e9eb0ce3606eb48.factory.bridge.near"),
-        ("near:USDT", "nep141:dac17f958d2ee523a2206206994597c13d831ec7.factory.bridge.near"),
+        (
+            "near:USDC",
+            "nep141:a0b86991c6218b36c1d19d4a2e9eb0ce3606eb48.factory.bridge.near",
+        ),
+        (
+            "near:USDT",
+            "nep141:dac17f958d2ee523a2206206994597c13d831ec7.factory.bridge.near",
+        ),
         ("eth:ETH", "nep141:eth.omft.near"),
         ("eth:USDC", "nep141:usdc.eth.omft.near"),
         ("eth:USDT", "nep141:usdt.eth.omft.near"),
@@ -419,12 +425,54 @@ pub fn resolve_asset_id(chain: &str, symbol: &str) -> Result<String, String> {
 /// Get the list of shieldable assets (human-readable for the UI).
 pub fn get_shieldable_assets() -> Vec<ShieldableAsset> {
     vec![
-        ShieldableAsset { chain: "eth".into(), symbol: "ETH".into(), name: "Ethereum".into(), asset_id: "nep141:eth.omft.near".into(), decimals: 18, icon: "E".into() },
-        ShieldableAsset { chain: "near".into(), symbol: "NEAR".into(), name: "NEAR".into(), asset_id: "nep141:wrap.near".into(), decimals: 24, icon: "N".into() },
-        ShieldableAsset { chain: "sol".into(), symbol: "SOL".into(), name: "Solana".into(), asset_id: "nep141:sol.omft.near".into(), decimals: 9, icon: "S".into() },
-        ShieldableAsset { chain: "btc".into(), symbol: "BTC".into(), name: "Bitcoin".into(), asset_id: "btc:btc".into(), decimals: 8, icon: "B".into() },
-        ShieldableAsset { chain: "eth".into(), symbol: "USDC".into(), name: "USDC".into(), asset_id: "nep141:usdc.eth.omft.near".into(), decimals: 6, icon: "$".into() },
-        ShieldableAsset { chain: "eth".into(), symbol: "USDT".into(), name: "USDT".into(), asset_id: "nep141:usdt.eth.omft.near".into(), decimals: 6, icon: "$".into() },
+        ShieldableAsset {
+            chain: "eth".into(),
+            symbol: "ETH".into(),
+            name: "Ethereum".into(),
+            asset_id: "nep141:eth.omft.near".into(),
+            decimals: 18,
+            icon: "E".into(),
+        },
+        ShieldableAsset {
+            chain: "near".into(),
+            symbol: "NEAR".into(),
+            name: "NEAR".into(),
+            asset_id: "nep141:wrap.near".into(),
+            decimals: 24,
+            icon: "N".into(),
+        },
+        ShieldableAsset {
+            chain: "sol".into(),
+            symbol: "SOL".into(),
+            name: "Solana".into(),
+            asset_id: "nep141:sol.omft.near".into(),
+            decimals: 9,
+            icon: "S".into(),
+        },
+        ShieldableAsset {
+            chain: "btc".into(),
+            symbol: "BTC".into(),
+            name: "Bitcoin".into(),
+            asset_id: "btc:btc".into(),
+            decimals: 8,
+            icon: "B".into(),
+        },
+        ShieldableAsset {
+            chain: "eth".into(),
+            symbol: "USDC".into(),
+            name: "USDC".into(),
+            asset_id: "nep141:usdc.eth.omft.near".into(),
+            decimals: 6,
+            icon: "$".into(),
+        },
+        ShieldableAsset {
+            chain: "eth".into(),
+            symbol: "USDT".into(),
+            name: "USDT".into(),
+            asset_id: "nep141:usdt.eth.omft.near".into(),
+            decimals: 6,
+            icon: "$".into(),
+        },
     ]
 }
 

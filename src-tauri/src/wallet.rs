@@ -98,7 +98,10 @@ fn validate_near_address(address: &str) -> Result<(), String> {
         return Ok(());
     }
 
-    Err("Invalid NEAR address: must be a .near/.testnet name or 64-char hex implicit account".to_string())
+    Err(
+        "Invalid NEAR address: must be a .near/.testnet name or 64-char hex implicit account"
+            .to_string(),
+    )
 }
 
 fn validate_eth_address(address: &str) -> Result<(), String> {
@@ -106,7 +109,10 @@ fn validate_eth_address(address: &str) -> Result<(), String> {
         return Err("ETH address must start with 0x".to_string());
     }
     if address.len() != 42 {
-        return Err(format!("ETH address must be 42 characters, got {}", address.len()));
+        return Err(format!(
+            "ETH address must be 42 characters, got {}",
+            address.len()
+        ));
     }
     if !address[2..].chars().all(|c| c.is_ascii_hexdigit()) {
         return Err("ETH address contains non-hex characters after 0x".to_string());
@@ -131,10 +137,7 @@ fn validate_sol_address(address: &str) -> Result<(), String> {
 fn validate_btc_address(address: &str) -> Result<(), String> {
     let len = address.len();
     if len < 25 || len > 62 {
-        return Err(format!(
-            "BTC address must be 25-62 characters, got {}",
-            len
-        ));
+        return Err(format!("BTC address must be 25-62 characters, got {}", len));
     }
     if !(address.starts_with('1')
         || address.starts_with('3')
@@ -180,15 +183,15 @@ fn validate_zec_address(address: &str) -> Result<(), String> {
     if address.starts_with("u1") {
         // Unified addresses vary in length but are typically 200+ chars
         if len < 50 {
-            return Err(format!(
-                "ZEC unified address seems too short, got {}",
-                len
-            ));
+            return Err(format!("ZEC unified address seems too short, got {}", len));
         }
         return Ok(());
     }
 
-    Err("ZEC address must start with t1/t3 (transparent), zs1 (shielded), or u1 (unified)".to_string())
+    Err(
+        "ZEC address must start with t1/t3 (transparent), zs1 (shielded), or u1 (unified)"
+            .to_string(),
+    )
 }
 
 // ---------------------------------------------------------------------------
@@ -251,15 +254,13 @@ pub fn save_wallet(wallet: &WalletInfo, secrets_dir: &std::path::Path) -> Result
 pub fn save_wallet_key(wallet_id: &str, wallet_info: &WalletInfo) -> Result<(), String> {
     let wallets_dir = secrets_dir()?.join("wallets");
 
-    fs::create_dir_all(&wallets_dir)
-        .map_err(|e| format!("Failed to create wallets dir: {}", e))?;
+    fs::create_dir_all(&wallets_dir).map_err(|e| format!("Failed to create wallets dir: {}", e))?;
 
     let path = wallets_dir.join(format!("{}.json", wallet_id));
     let content = serde_json::to_string_pretty(wallet_info)
         .map_err(|e| format!("Failed to serialize wallet key: {}", e))?;
 
-    fs::write(&path, content)
-        .map_err(|e| format!("Failed to write wallet key: {}", e))?;
+    fs::write(&path, content).map_err(|e| format!("Failed to write wallet key: {}", e))?;
 
     #[cfg(unix)]
     {
@@ -275,17 +276,19 @@ pub fn save_wallet_key(wallet_id: &str, wallet_info: &WalletInfo) -> Result<(), 
 /// `~/.nyx/secrets/wallets/{wallet_id}.json`.
 /// Returns `Ok(None)` when the file does not exist.
 pub fn load_wallet_key(wallet_id: &str) -> Result<Option<WalletInfo>, String> {
-    let path = secrets_dir()?.join("wallets").join(format!("{}.json", wallet_id));
+    let path = secrets_dir()?
+        .join("wallets")
+        .join(format!("{}.json", wallet_id));
 
     if !path.exists() {
         return Ok(None);
     }
 
-    let content = fs::read_to_string(&path)
-        .map_err(|e| format!("Failed to read wallet key: {}", e))?;
+    let content =
+        fs::read_to_string(&path).map_err(|e| format!("Failed to read wallet key: {}", e))?;
 
-    let info: WalletInfo = serde_json::from_str(&content)
-        .map_err(|e| format!("Failed to parse wallet key: {}", e))?;
+    let info: WalletInfo =
+        serde_json::from_str(&content).map_err(|e| format!("Failed to parse wallet key: {}", e))?;
 
     Ok(Some(info))
 }
