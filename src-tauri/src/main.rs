@@ -713,6 +713,22 @@ fn clear_intelligence_data() -> Result<(), String> {
     intelligence::clear_all_data()
 }
 
+/// Permanently wipe ALL local Nyx data — wallet keys, provider/gateway secrets,
+/// ClawdTalk config, every local database, caches, logs and workspace. The
+/// daemon is stopped first so it can't rewrite files or hold DB handles during
+/// the wipe. `confirm` must be `true`; this is a minimal guard against an
+/// accidental invoke (a full native-confirmation gate is tracked separately).
+/// Returns the list of top-level `~/.nyx` entries that were removed.
+#[tauri::command]
+async fn purge_local_data(confirm: bool) -> Result<Vec<String>, String> {
+    if !confirm {
+        return Err("purge_local_data requires confirm=true".to_string());
+    }
+    // Best-effort: stop the daemon before deleting its config/database.
+    let _ = ironclaw::stop_daemon().await;
+    config::purge_local_data()
+}
+
 // ---------------------------------------------------------------------------
 // Web Browser (agent-controlled browsing)
 // ---------------------------------------------------------------------------
@@ -1226,6 +1242,7 @@ fn main() {
             get_autonomy_settings,
             set_autonomy_level,
             clear_intelligence_data,
+            purge_local_data,
             // Tasks
             list_tasks,
             create_task,
