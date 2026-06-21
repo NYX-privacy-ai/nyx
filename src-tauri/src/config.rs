@@ -87,14 +87,19 @@ impl GuardrailsConfig {
             },
             SecurityPreset::Autonomous => GuardrailsConfig {
                 preset: SecurityPreset::Autonomous,
-                max_transaction_usd: 1_000_000.0,
-                daily_loss_percent: 100.0,
-                weekly_loss_percent: 100.0,
-                daily_tx_limit: 1000,
+                // "Autonomous" = highest automation, but still bounded by hard
+                // safety caps. These are deliberately NOT unlimited: the old
+                // $1M / 100% loss / 50% slippage / 1000-tx values were effectively
+                // no guardrails on a live-funds wallet. Kept in sync with the UI
+                // preset objects (setup/settings +page.svelte) and validate().
+                max_transaction_usd: 10_000.0,
+                daily_loss_percent: 25.0,
+                weekly_loss_percent: 50.0,
+                daily_tx_limit: 100,
                 require_confirmation: false,
-                max_slippage_percent: 50.0,
-                max_concentration_percent: 100.0,
-                min_health_factor: 1.0,
+                max_slippage_percent: 5.0,
+                max_concentration_percent: 75.0,
+                min_health_factor: 1.3,
             },
             SecurityPreset::Custom => GuardrailsConfig {
                 preset: SecurityPreset::Custom,
@@ -108,6 +113,85 @@ impl GuardrailsConfig {
                 min_health_factor: 1.5,
             },
         }
+    }
+}
+
+impl GuardrailsConfig {
+    /// Maximum values the backend will accept, regardless of what the frontend
+    /// sends. These are sanity ceilings, not recommendations.
+    const MAX_TX_USD_CEILING: f64 = 10_000_000.0;
+    const MAX_DAILY_TX_CEILING: u32 = 10_000;
+
+    /// Validate guardrail values before they are persisted. The frontend's
+    /// number inputs are NOT trusted — a compromised or buggy webview can send
+    /// arbitrary JSON, so every field is re-checked here. Returns a
+    /// human-readable error describing the first violation found.
+    pub fn validate(&self) -> Result<(), String> {
+        // Reject NaN / infinity on every float field first.
+        for (name, v) in [
+            ("max_transaction_usd", self.max_transaction_usd),
+            ("daily_loss_percent", self.daily_loss_percent),
+            ("weekly_loss_percent", self.weekly_loss_percent),
+            ("max_slippage_percent", self.max_slippage_percent),
+            ("max_concentration_percent", self.max_concentration_percent),
+            ("min_health_factor", self.min_health_factor),
+        ] {
+            if !v.is_finite() {
+                return Err(format!("{} must be a finite number", name));
+            }
+        }
+
+        // Transaction cap: non-negative and under the hard ceiling.
+        if self.max_transaction_usd < 0.0 {
+            return Err("max_transaction_usd cannot be negative".to_string());
+        }
+        if self.max_transaction_usd > Self::MAX_TX_USD_CEILING {
+            return Err(format!(
+                "max_transaction_usd exceeds the maximum allowed ceiling (${:.0})",
+                Self::MAX_TX_USD_CEILING
+            ));
+        }
+
+        // Percentage fields must be within 0..=100.
+        for (name, v) in [
+            ("daily_loss_percent", self.daily_loss_percent),
+            ("weekly_loss_percent", self.weekly_loss_percent),
+            ("max_slippage_percent", self.max_slippage_percent),
+            ("max_concentration_percent", self.max_concentration_percent),
+        ] {
+            if !(0.0..=100.0).contains(&v) {
+                return Err(format!("{} must be between 0 and 100", name));
+            }
+        }
+
+        // A weekly loss budget smaller than the daily one is incoherent.
+        if self.weekly_loss_percent < self.daily_loss_percent {
+            return Err(
+                "weekly_loss_percent must be greater than or equal to daily_loss_percent"
+                    .to_string(),
+            );
+        }
+
+        // Health factor below 1.0 is at/under liquidation — never allow it.
+        if self.min_health_factor < 1.0 {
+            return Err(
+                "min_health_factor must be at least 1.0 (below 1.0 is liquidation territory)"
+                    .to_string(),
+            );
+        }
+
+        // Daily tx limit: at least 1, under the hard ceiling.
+        if self.daily_tx_limit == 0 {
+            return Err("daily_tx_limit must be at least 1".to_string());
+        }
+        if self.daily_tx_limit > Self::MAX_DAILY_TX_CEILING {
+            return Err(format!(
+                "daily_tx_limit exceeds the maximum allowed ceiling ({})",
+                Self::MAX_DAILY_TX_CEILING
+            ));
+        }
+
+        Ok(())
     }
 }
 
@@ -1065,16 +1149,25 @@ dedup_threshold = 0.85
 
 /// Write guardrails config from the provided GuardrailsConfig.
 pub fn write_guardrails(guardrails: &GuardrailsConfig) -> Result<(), String> {
+    // Defence in depth: never persist values that fail validation, no matter
+    // which code path called us.
+    guardrails.validate()?;
+
     let home = home_dir();
     let path = home.join(".nyx/secrets/defi_guardrails.env");
 
+    // NOTE: these names MUST match exactly what guardrails.py reads (see its
+    // DEFAULTS dict). The previous short names (MAX_TX_USD, DAILY_LOSS_PCT,
+    // WEEKLY_LOSS_PCT, BURROW_MIN_HEALTH) did not match, so the Python helper
+    // silently fell back to its hardcoded defaults and ignored the user's
+    // chosen preset. They are also the same names write_nyx_env emits.
     let content = format!(
         "# Nyx DeFi Guardrails\n\
-         MAX_TX_USD={}\n\
-         DAILY_LOSS_PCT={}\n\
-         WEEKLY_LOSS_PCT={}\n\
+         MAX_SINGLE_TX_USD={}\n\
+         DAILY_LOSS_LIMIT_PCT={}\n\
+         WEEKLY_LOSS_LIMIT_PCT={}\n\
          MAX_CONCENTRATION_PCT={}\n\
-         BURROW_MIN_HEALTH={}\n\
+         BURROW_MIN_HEALTH_FACTOR={}\n\
          MAX_SLIPPAGE_PCT={}\n\
          MAX_DAILY_TXS={}\n\
          REQUIRE_CONFIRMATION={}\n",
@@ -1538,4 +1631,101 @@ fn copy_dir_contents(src: &Path, dst: &Path) -> Result<(), String> {
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn all_builtin_presets_validate() {
+        for preset in [
+            SecurityPreset::Conservative,
+            SecurityPreset::Balanced,
+            SecurityPreset::Autonomous,
+            SecurityPreset::Custom,
+        ] {
+            let g = GuardrailsConfig::from_preset(preset.clone());
+            assert!(
+                g.validate().is_ok(),
+                "built-in preset {:?} should validate: {:?}",
+                preset,
+                g.validate()
+            );
+        }
+    }
+
+    #[test]
+    fn autonomous_preset_is_bounded_not_unlimited() {
+        // Regression guard: the old Autonomous preset was effectively no limits
+        // ($1M / 100% / 50% / 1000 tx). Keep it bounded.
+        let g = GuardrailsConfig::from_preset(SecurityPreset::Autonomous);
+        assert!(g.max_transaction_usd <= 100_000.0);
+        assert!(g.daily_loss_percent <= 50.0);
+        assert!(g.max_slippage_percent <= 10.0);
+        assert!(g.daily_tx_limit <= 500);
+        assert!(g.min_health_factor >= 1.0);
+    }
+
+    fn balanced() -> GuardrailsConfig {
+        GuardrailsConfig::from_preset(SecurityPreset::Balanced)
+    }
+
+    #[test]
+    fn rejects_nan_and_infinity() {
+        let mut g = balanced();
+        g.max_transaction_usd = f64::NAN;
+        assert!(g.validate().is_err());
+
+        let mut g = balanced();
+        g.max_slippage_percent = f64::INFINITY;
+        assert!(g.validate().is_err());
+    }
+
+    #[test]
+    fn rejects_negative_transaction_cap() {
+        let mut g = balanced();
+        g.max_transaction_usd = -1.0;
+        assert!(g.validate().is_err());
+    }
+
+    #[test]
+    fn rejects_percent_over_100() {
+        let mut g = balanced();
+        g.daily_loss_percent = 150.0;
+        assert!(g.validate().is_err());
+    }
+
+    #[test]
+    fn rejects_weekly_below_daily_loss() {
+        let mut g = balanced();
+        g.daily_loss_percent = 20.0;
+        g.weekly_loss_percent = 10.0;
+        assert!(g.validate().is_err());
+    }
+
+    #[test]
+    fn rejects_health_factor_below_one() {
+        let mut g = balanced();
+        g.min_health_factor = 0.9;
+        assert!(g.validate().is_err());
+    }
+
+    #[test]
+    fn rejects_zero_and_oversized_tx_limit() {
+        let mut g = balanced();
+        g.daily_tx_limit = 0;
+        assert!(g.validate().is_err());
+
+        let mut g = balanced();
+        g.daily_tx_limit = 1_000_000;
+        assert!(g.validate().is_err());
+    }
+
+    #[test]
+    fn rejects_transaction_cap_over_ceiling() {
+        let mut g = balanced();
+        g.max_transaction_usd = 50_000_000.0;
+        assert!(g.validate().is_err());
+    }
 }

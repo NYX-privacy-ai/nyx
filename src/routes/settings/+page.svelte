@@ -159,7 +159,7 @@
   function detectPreset(g: typeof guardrails): string {
     if (g.maxTransactionUsd === 100 && g.dailyLossPercent === 2 && g.weeklyLossPercent === 5 && g.requireConfirmation) return 'conservative';
     if (g.maxTransactionUsd === 500 && g.dailyLossPercent === 5 && g.weeklyLossPercent === 15 && !g.requireConfirmation) return 'balanced';
-    if (g.maxTransactionUsd >= 1000000 && g.dailyLossPercent >= 100 && !g.requireConfirmation) return 'autonomous';
+    if (g.maxTransactionUsd === 10000 && g.dailyLossPercent === 25 && g.weeklyLossPercent === 50 && !g.requireConfirmation) return 'autonomous';
     return 'custom';
   }
 
@@ -288,7 +288,7 @@
     const presets: Record<string, typeof guardrails> = {
       conservative: { maxTransactionUsd: 100, dailyLossPercent: 2, weeklyLossPercent: 5, dailyTxLimit: 10, requireConfirmation: true, maxSlippagePercent: 1, maxConcentrationPercent: 25, minHealthFactor: 2.0 },
       balanced: { maxTransactionUsd: 500, dailyLossPercent: 5, weeklyLossPercent: 15, dailyTxLimit: 20, requireConfirmation: false, maxSlippagePercent: 2, maxConcentrationPercent: 40, minHealthFactor: 1.5 },
-      autonomous: { maxTransactionUsd: 1000000, dailyLossPercent: 100, weeklyLossPercent: 100, dailyTxLimit: 1000, requireConfirmation: false, maxSlippagePercent: 50, maxConcentrationPercent: 100, minHealthFactor: 1.0 },
+      autonomous: { maxTransactionUsd: 10000, dailyLossPercent: 25, weeklyLossPercent: 50, dailyTxLimit: 100, requireConfirmation: false, maxSlippagePercent: 5, maxConcentrationPercent: 75, minHealthFactor: 1.3 },
     };
     if (presets[preset]) guardrails = { ...presets[preset] };
   }
@@ -1038,10 +1038,10 @@
               />
               <SecurityPresetCard
                 name="Autonomous"
-                description="No limits."
+                description="Highest automation, still capped."
                 selected={securityPreset === 'autonomous'}
                 onclick={() => applyPreset('autonomous')}
-                metrics={{ maxTx: 'No limit', dailyLoss: 'No limit', confirmation: 'Off' }}
+                metrics={{ maxTx: '$10,000', dailyLoss: '25%', confirmation: 'Off' }}
               />
               <SecurityPresetCard
                 name="Custom"

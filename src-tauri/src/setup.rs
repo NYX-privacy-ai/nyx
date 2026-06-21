@@ -137,6 +137,11 @@ pub async fn run_setup_v2(
     email_notifications: config::EmailNotificationsConfig,
     capabilities: config::CapabilitiesConfig,
 ) -> Result<String, String> {
+    // Validate guardrails up front, before anything is written to disk. The
+    // wizard's number inputs are not trusted; reject bad values before they
+    // can land in .env / config.toml / defi_guardrails.env.
+    guardrails.validate()?;
+
     let gateway_token = config::generate_token();
     let nyx_dir = ironclaw::config_dir();
 
