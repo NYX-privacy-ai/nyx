@@ -2,6 +2,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 // Shared modules from nyx_lib (used by both Tauri GUI and MCP server)
+use nyx_lib::audit;
 use nyx_lib::config;
 use nyx_lib::docker;
 use nyx_lib::gateway;
@@ -161,6 +162,10 @@ async fn generate_near_wallet_full() -> Result<(wallet::WalletInfo, config::Wall
     // file keyed by the same id the UI later sends to run_setup_v2.
     wallet::save_wallet(&info, &secrets_dir)?;
     wallet::save_wallet_key(&wallet_config.id, &info)?;
+    audit::record(
+        "wallet.generate",
+        &format!("address={}", wallet_config.address),
+    );
 
     Ok((info, wallet_config))
 }
@@ -408,6 +413,10 @@ async fn execute_zec_shield(
     let zec_address = config::get_zec_address()
         .ok_or_else(|| "No ZEC address configured. Add a ZEC wallet in Settings.".to_string())?;
     let refund_to = config::get_near_account().unwrap_or_else(|| "nyx.near".to_string());
+    audit::record(
+        "defi.execute_zec_shield",
+        &format!("from={} amount={}", from_asset, amount),
+    );
     oneclick::execute_zec_shield(&from_asset, &amount, &zec_address, &refund_to).await
 }
 
@@ -420,6 +429,13 @@ async fn execute_zec_unshield(
 ) -> Result<oneclick::QuoteResponse, String> {
     let zec_refund = config::get_zec_address()
         .ok_or_else(|| "No ZEC address configured. Add a ZEC wallet in Settings.".to_string())?;
+    audit::record(
+        "defi.execute_zec_unshield",
+        &format!(
+            "to={} amount={} recipient={}",
+            to_asset, zec_amount, recipient
+        ),
+    );
     oneclick::execute_zec_unshield(&to_asset, &zec_amount, &recipient, &zec_refund).await
 }
 
@@ -460,6 +476,13 @@ async fn execute_confidential_swap(
     amount: String,
 ) -> Result<oneclick::QuoteResponse, String> {
     let near_account = config::get_near_account().unwrap_or_else(|| "nyx.near".to_string());
+    audit::record(
+        "defi.execute_confidential_swap",
+        &format!(
+            "origin={} dest={} amount={}",
+            origin_asset, destination_asset, amount
+        ),
+    );
     oneclick::execute_confidential_swap(
         &origin_asset,
         &destination_asset,
@@ -615,6 +638,7 @@ fn read_current_config() -> Result<config::SettingsConfig, String> {
 
 #[tauri::command]
 fn save_settings(update: config::SettingsUpdate) -> Result<config::SettingsSaveResult, String> {
+    audit::record("config.save_settings", "settings/.env rewritten");
     config::save_settings(update)
 }
 
@@ -727,6 +751,7 @@ async fn purge_local_data(confirm: bool) -> Result<Vec<String>, String> {
     if !confirm {
         return Err("purge_local_data requires confirm=true".to_string());
     }
+    audit::record("purge_local_data", "stopping daemon and removing ~/.nyx");
     // Best-effort: stop the daemon before deleting its config/database.
     let _ = ironclaw::stop_daemon().await;
     config::purge_local_data()
@@ -822,6 +847,8 @@ fn browser_select_option(
 
 #[tauri::command]
 async fn browser_execute_js(app: tauri::AppHandle, code: String) -> Result<String, String> {
+    let preview: String = code.chars().take(120).collect();
+    audit::record("browser.execute_js", &format!("code[:120]={}", preview));
     browser::execute_js(&app, &code).await
 }
 
@@ -861,6 +888,7 @@ fn clawdtalk_configure(api_key: String) -> Result<(), String> {
     // .env — nothing reads CLAWDTALK_API_KEY from there, so a second plaintext
     // copy of the secret was pure extra exposure. Any legacy .env entry is
     // cleaned up by clawdtalk_disable.
+    audit::record("clawdtalk.configure", "api key updated");
     let agent_name = get_agent_name().ok();
     clawdtalk::write_config(
         &api_key,
