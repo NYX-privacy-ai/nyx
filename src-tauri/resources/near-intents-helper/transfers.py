@@ -28,7 +28,7 @@ from tx_builder import TransactionBuilder
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
-LOG_DIR = Path.home() / ".openclaw" / "defi-state" / "logs"
+LOG_DIR = Path.home() / ".nyx" / "defi-state" / "logs"
 AUDIT_LOG = LOG_DIR / "audit.jsonl"
 
 YOCTO = 10**24

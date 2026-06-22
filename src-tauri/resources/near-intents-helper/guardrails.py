@@ -5,7 +5,7 @@ Python-enforced guardrails for Nyx DeFi engine.
 These guardrails are enforced in code — they CANNOT be overridden by the LLM.
 All checks happen BEFORE any transaction is signed or submitted.
 
-Configurable via ~/.openclaw/secrets/defi_guardrails.env
+Configurable via ~/.nyx/secrets/defi_guardrails.env
 
 Portable module — no OpenClaw-specific dependencies.
 """
@@ -75,8 +75,8 @@ class Guardrails:
         # no secrets file mount needed.
         # NOTE: this default must match where the Rust setup writes the file
         # (config.rs write_guardrails -> ~/.nyx/secrets/defi_guardrails.env).
-        # It previously pointed at ~/.openclaw, so the helper never saw the
-        # user's guardrails and silently used DEFAULTS.
+        # It previously pointed at the old ~/.openclaw namespace, so the helper
+        # never saw the user's guardrails and silently used DEFAULTS.
         env_path = env_file or str(Path.home() / ".nyx" / "secrets" / "defi_guardrails.env")
         if Path(env_path).exists():
             load_dotenv(env_path)
@@ -126,9 +126,12 @@ class Guardrails:
     # ------------------------------------------------------------------
 
     def check_tx_size(self, amount_usd: float):
-        """Check that transaction doesn't exceed max single tx size."""
-        if self.config.max_single_tx_usd >= 1_000_000:
-            return  # Effectively no limit (Autonomous preset)
+        """Check that transaction doesn't exceed max single tx size.
+
+        The configured cap is ALWAYS enforced. (A previous `>= 1_000_000`
+        escape hatch meant a high cap disabled the check entirely instead of
+        enforcing it — a hole now that presets/validation allow caps up to $10M.)
+        """
         if amount_usd > self.config.max_single_tx_usd:
             raise GuardrailViolation(
                 "MAX_TX_SIZE",
@@ -160,8 +163,8 @@ class Guardrails:
             token: Token being added to.
             add_amount_usd: USD value being added.
         """
-        if self.config.max_concentration_pct >= 100:
-            return  # No concentration limit (Autonomous preset)
+        # The configured concentration cap is always enforced; a 100% cap simply
+        # never triggers the violation below (any single asset is <= 100%).
         total = sum(holdings_usd.values()) + add_amount_usd
         if total <= 0:
             return

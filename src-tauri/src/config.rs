@@ -983,6 +983,71 @@ pub fn create_directories() -> Result<(), String> {
 }
 
 // ---------------------------------------------------------------------------
+// Legacy data migration (~/.openclaw -> ~/.nyx)
+// ---------------------------------------------------------------------------
+
+/// Recursively copy `from` into `to`, preserving Unix mode bits on both files
+/// and directories. Symlinks are skipped. Kept path-parameterized so it can be
+/// unit-tested with temp dirs (no HOME dependency).
+fn copy_tree_preserving(from: &Path, to: &Path) -> Result<(), String> {
+    fs::create_dir_all(to).map_err(|e| format!("create {}: {}", to.display(), e))?;
+    for entry in fs::read_dir(from).map_err(|e| format!("read {}: {}", from.display(), e))? {
+        let entry = entry.map_err(|e| e.to_string())?;
+        let src = entry.path();
+        let dst = to.join(entry.file_name());
+        let ft = entry.file_type().map_err(|e| e.to_string())?;
+        if ft.is_dir() {
+            copy_tree_preserving(&src, &dst)?;
+        } else if ft.is_file() {
+            fs::copy(&src, &dst).map_err(|e| format!("copy {}: {}", src.display(), e))?;
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                if let Ok(meta) = fs::metadata(&src) {
+                    let _ = fs::set_permissions(
+                        &dst,
+                        fs::Permissions::from_mode(meta.permissions().mode()),
+                    );
+                }
+            }
+        }
+        // Symlinks are intentionally skipped.
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        if let Ok(meta) = fs::metadata(from) {
+            let _ = fs::set_permissions(to, fs::Permissions::from_mode(meta.permissions().mode()));
+        }
+    }
+    Ok(())
+}
+
+/// Core of the legacy migration, path-parameterized for testing. Copies `legacy`
+/// into `target` only when `target` does not yet exist and `legacy` does, then
+/// drops a `.migrated-from-openclaw` marker so it's a one-time, idempotent move.
+/// Returns `true` if a migration was performed.
+fn migrate_legacy_dir(legacy: &Path, target: &Path) -> Result<bool, String> {
+    if target.exists() || !legacy.exists() {
+        return Ok(false);
+    }
+    copy_tree_preserving(legacy, target)?;
+    let _ = fs::write(
+        target.join(".migrated-from-openclaw"),
+        "Migrated from ~/.openclaw by Nyx setup.\n",
+    );
+    Ok(true)
+}
+
+/// On first run, migrate an existing `~/.openclaw` install into `~/.nyx`
+/// (preserving permissions) so upgrading users keep their wallet/config/state.
+/// No-op once `~/.nyx` exists. Must run before `create_directories`.
+pub fn migrate_legacy_openclaw() -> Result<bool, String> {
+    let home = home_dir();
+    migrate_legacy_dir(&home.join(".openclaw"), &home.join(".nyx"))
+}
+
+// ---------------------------------------------------------------------------
 // .env (IronClaw environment)
 // ---------------------------------------------------------------------------
 
@@ -1899,6 +1964,76 @@ mod tests {
         let mut g = balanced();
         g.max_transaction_usd = 50_000_000.0;
         assert!(g.validate().is_err());
+    }
+
+    fn unique_tmp(tag: &str) -> std::path::PathBuf {
+        use std::sync::atomic::{AtomicU32, Ordering};
+        static COUNTER: AtomicU32 = AtomicU32::new(0);
+        let n = COUNTER.fetch_add(1, Ordering::Relaxed);
+        std::env::temp_dir().join(format!("nyx-test-{}-{}-{}", tag, std::process::id(), n))
+    }
+
+    #[test]
+    fn copy_tree_preserves_nested_files_and_mode() {
+        let root = unique_tmp("copytree");
+        let from = root.join("from");
+        let to = root.join("to");
+        std::fs::create_dir_all(from.join("secrets")).unwrap();
+        std::fs::write(from.join("config.toml"), "name = 'x'").unwrap();
+        std::fs::write(from.join("secrets/key.json"), "{}").unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(
+                from.join("secrets/key.json"),
+                std::fs::Permissions::from_mode(0o600),
+            )
+            .unwrap();
+        }
+
+        copy_tree_preserving(&from, &to).unwrap();
+
+        assert_eq!(
+            std::fs::read_to_string(to.join("config.toml")).unwrap(),
+            "name = 'x'"
+        );
+        assert!(to.join("secrets/key.json").exists());
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mode = std::fs::metadata(to.join("secrets/key.json"))
+                .unwrap()
+                .permissions()
+                .mode();
+            assert_eq!(mode & 0o777, 0o600);
+        }
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn migrate_legacy_dir_runs_once_and_is_guarded() {
+        let root = unique_tmp("migrate");
+        let legacy = root.join(".openclaw");
+        let target = root.join(".nyx");
+        std::fs::create_dir_all(&legacy).unwrap();
+        std::fs::write(legacy.join("config.toml"), "legacy").unwrap();
+
+        // First run migrates and drops the marker.
+        assert!(migrate_legacy_dir(&legacy, &target).unwrap());
+        assert_eq!(
+            std::fs::read_to_string(target.join("config.toml")).unwrap(),
+            "legacy"
+        );
+        assert!(target.join(".migrated-from-openclaw").exists());
+
+        // Second run is a no-op because the target now exists.
+        assert!(!migrate_legacy_dir(&legacy, &target).unwrap());
+
+        // No legacy dir => no migration.
+        let fresh = unique_tmp("migrate-fresh");
+        assert!(!migrate_legacy_dir(&fresh.join(".openclaw"), &fresh.join(".nyx")).unwrap());
+
+        let _ = std::fs::remove_dir_all(&root);
     }
 
     #[test]

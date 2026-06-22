@@ -53,6 +53,9 @@ pub async fn run_setup(
 ) -> Result<String, String> {
     let gateway_token = config::generate_token();
 
+    // Step 0: migrate a legacy ~/.openclaw install into ~/.nyx (one-time).
+    config::migrate_legacy_openclaw()?;
+
     // Step 1: Create directory structure
     config::create_directories()?;
 
@@ -150,6 +153,9 @@ pub async fn run_setup_v2(
     // Each step prefixes its error with a stage label so the UI can show
     // exactly which part of setup failed (Docker/config/resources/daemon) and
     // offer a precise recovery action instead of a generic "Setup Failed".
+    // Step 0: migrate a legacy ~/.openclaw install into ~/.nyx (one-time).
+    config::migrate_legacy_openclaw().map_err(|e| format!("[migrate legacy data] {}", e))?;
+
     // Step 1: Create directory structure
     config::create_directories().map_err(|e| format!("[create directories] {}", e))?;
 

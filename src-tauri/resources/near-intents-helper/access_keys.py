@@ -75,7 +75,7 @@ DEFI_KEY_PERMISSIONS = [
     },
 ]
 
-SECRETS_DIR = Path.home() / ".openclaw" / "secrets"
+SECRETS_DIR = Path.home() / ".nyx" / "secrets"
 KEYS_FILE = SECRETS_DIR / "function_call_keys.json"
 NEAR_DECIMALS = 24
 

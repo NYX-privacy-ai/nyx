@@ -20,7 +20,7 @@ from typing import Any, Optional
 from near_rpc import NearRpcClient, MAINNET_RPC
 
 # Default state directory (overridable)
-DEFAULT_STATE_DIR = Path.home() / ".openclaw" / "defi-state"
+DEFAULT_STATE_DIR = Path.home() / ".nyx" / "defi-state"
 
 # Asset registry (must match near_intents.py)
 TOKEN_CONTRACTS = {

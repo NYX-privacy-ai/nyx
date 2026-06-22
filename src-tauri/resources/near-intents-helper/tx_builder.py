@@ -379,7 +379,7 @@ def load_signing_key(account_file: Optional[str] = None):
         return env_account, _parse_near_key(env_key)
 
     from pathlib import Path
-    path = Path(account_file) if account_file else (Path.home() / ".openclaw" / "secrets" / "near_account.json")
+    path = Path(account_file) if account_file else (Path.home() / ".nyx" / "secrets" / "near_account.json")
     with open(path, "r") as f:
         data = json.load(f)
 
