@@ -116,10 +116,13 @@ fn check_process_running() -> (bool, Option<u32>) {
 // ---------------------------------------------------------------------------
 
 /// Write ClawdTalk skill-config.json with the actual API key value.
-/// Shell scripts (call.sh, sms.sh etc.) read this via jq and cannot resolve
-/// env var references, so the raw key must be written directly.
+///
+/// This is the single on-disk store for the ClawdTalk key (chmod 600 below).
+/// The shell scripts (call.sh, sms.sh, …) read it via `jq` and cannot resolve
+/// `${ENV_VAR}` references, so the raw key is written here directly rather than
+/// also being duplicated into `.env`.
 pub fn write_config(
-    api_key_ref: &str,
+    api_key: &str,
     owner_name: Option<&str>,
     agent_name: Option<&str>,
 ) -> Result<(), String> {
@@ -133,7 +136,7 @@ pub fn write_config(
     };
 
     let config = serde_json::json!({
-        "api_key": api_key_ref,
+        "api_key": api_key,
         "server": "https://clawdtalk.com",
         "owner_name": owner_name,
         "agent_name": agent_name,

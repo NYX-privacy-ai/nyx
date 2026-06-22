@@ -2381,6 +2381,7 @@ dependencies = [
  "tauri-plugin-shell",
  "tauri-plugin-updater",
  "tokio",
+ "toml 0.8.2",
  "url",
  "uuid",
 ]

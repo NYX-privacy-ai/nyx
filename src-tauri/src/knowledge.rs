@@ -124,6 +124,36 @@ pub fn init_tables(conn: &Connection) -> Result<(), String> {
 // Helpers
 // ---------------------------------------------------------------------------
 
+const VALID_CATEGORIES: &[&str] = &[
+    "entity", "concept", "document", "note", "meeting", "project",
+];
+
+fn validate_category(value: &str) -> Result<(), String> {
+    if VALID_CATEGORIES.contains(&value) {
+        Ok(())
+    } else {
+        Err(format!(
+            "invalid category: '{}' (allowed: {})",
+            value,
+            VALID_CATEGORIES.join(", ")
+        ))
+    }
+}
+
+/// Turn arbitrary user input into a safe FTS5 MATCH expression: each
+/// whitespace-separated token becomes a quoted phrase (embedded quotes
+/// doubled), so special characters and operators (`"`, `*`, `AND`, `:`, …)
+/// can't cause a query-syntax error. Returns an empty string when there are no
+/// usable tokens.
+fn fts_sanitize(query: &str) -> String {
+    query
+        .split_whitespace()
+        .filter(|t| !t.is_empty())
+        .map(|t| format!("\"{}\"", t.replace('"', "\"\"")))
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
 fn parse_json_array(s: &str) -> Vec<String> {
     serde_json::from_str(s).unwrap_or_default()
 }
@@ -189,6 +219,12 @@ pub fn list_entries(
 }
 
 pub fn search_entries(query: &str) -> Result<Vec<KnowledgeEntry>, String> {
+    // Sanitize into a safe FTS5 expression; blank input → no results.
+    let match_expr = fts_sanitize(query);
+    if match_expr.is_empty() {
+        return Ok(vec![]);
+    }
+
     let conn = intelligence::open_db_pub()?;
     let mut stmt = conn
         .prepare(
@@ -201,12 +237,15 @@ pub fn search_entries(query: &str) -> Result<Vec<KnowledgeEntry>, String> {
         )
         .map_err(|e| e.to_string())?;
 
-    let rows = stmt
-        .query_map(params![query], row_to_entry)
-        .map_err(|e| e.to_string())?;
+    // Degrade gracefully: a malformed FTS query yields no results rather than
+    // surfacing a raw SQLite syntax error to the user.
+    let rows = match stmt.query_map(params![match_expr], row_to_entry) {
+        Ok(rows) => rows,
+        Err(_) => return Ok(vec![]),
+    };
     let mut entries = vec![];
-    for row in rows {
-        entries.push(row.map_err(|e| e.to_string())?);
+    for row in rows.flatten() {
+        entries.push(row);
     }
     Ok(entries)
 }
@@ -227,6 +266,7 @@ pub fn create_entry(input: CreateKnowledgeInput) -> Result<KnowledgeEntry, Strin
     let tags =
         serde_json::to_string(&input.tags.unwrap_or_default()).unwrap_or_else(|_| "[]".to_string());
     let category = input.category.unwrap_or_else(|| "note".to_string());
+    validate_category(&category)?;
     let related = serde_json::to_string(&input.related_ids.unwrap_or_default())
         .unwrap_or_else(|_| "[]".to_string());
 
@@ -265,6 +305,7 @@ pub fn update_entry(id: i64, input: UpdateKnowledgeInput) -> Result<KnowledgeEnt
         param_idx += 1;
     }
     if let Some(v) = &input.category {
+        validate_category(v)?;
         sets.push(format!("category = ?{}", param_idx));
         params_vec.push(Box::new(v.clone()));
         param_idx += 1;
@@ -288,8 +329,12 @@ pub fn update_entry(id: i64, input: UpdateKnowledgeInput) -> Result<KnowledgeEnt
 
 pub fn delete_entry(id: i64) -> Result<(), String> {
     let conn = intelligence::open_db_pub()?;
-    conn.execute("DELETE FROM knowledge WHERE id = ?1", params![id])
+    let affected = conn
+        .execute("DELETE FROM knowledge WHERE id = ?1", params![id])
         .map_err(|e| e.to_string())?;
+    if affected == 0 {
+        return Err(format!("Knowledge entry {} not found", id));
+    }
     Ok(())
 }
 
@@ -353,4 +398,32 @@ pub fn get_knowledge_stats() -> Result<KnowledgeStats, String> {
         recent_count_7d: recent_7d,
         top_tags,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn fts_sanitize_quotes_tokens() {
+        assert_eq!(fts_sanitize("hello world"), "\"hello\" \"world\"");
+        // Embedded double-quotes are doubled, not left to break the expression.
+        assert_eq!(fts_sanitize("a\"b"), "\"a\"\"b\"");
+        // FTS operators/special chars become literal quoted tokens.
+        assert_eq!(fts_sanitize("foo OR *"), "\"foo\" \"OR\" \"*\"");
+    }
+
+    #[test]
+    fn fts_sanitize_blank_is_empty() {
+        assert_eq!(fts_sanitize(""), "");
+        assert_eq!(fts_sanitize("   \t  "), "");
+    }
+
+    #[test]
+    fn validates_category() {
+        assert!(validate_category("note").is_ok());
+        assert!(validate_category("project").is_ok());
+        assert!(validate_category("random").is_err());
+        assert!(validate_category("").is_err());
+    }
 }
