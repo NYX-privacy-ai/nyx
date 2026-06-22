@@ -788,18 +788,25 @@ fn browser_scroll(
 }
 
 #[tauri::command]
-fn browser_read_page(app: tauri::AppHandle) -> Result<String, String> {
-    browser::read_page(&app)
+async fn browser_read_page(app: tauri::AppHandle) -> Result<String, String> {
+    browser::read_page(&app).await
 }
 
 #[tauri::command]
-fn browser_read_links(app: tauri::AppHandle) -> Result<String, String> {
-    browser::read_links(&app)
+async fn browser_read_links(app: tauri::AppHandle) -> Result<String, String> {
+    browser::read_links(&app).await
 }
 
 #[tauri::command]
-fn browser_read_forms(app: tauri::AppHandle) -> Result<String, String> {
-    browser::read_forms(&app)
+async fn browser_read_forms(app: tauri::AppHandle) -> Result<String, String> {
+    browser::read_forms(&app).await
+}
+
+/// Callback target for browser JS evaluation. Injected page JS invokes this with
+/// a unique id + serialized result; it resolves the awaiting eval_js_collect call.
+#[tauri::command]
+fn __browser_js_result(id: String, result: String) {
+    browser::resolve_js_result(id, result);
 }
 
 #[tauri::command]
@@ -812,8 +819,8 @@ fn browser_select_option(
 }
 
 #[tauri::command]
-fn browser_execute_js(app: tauri::AppHandle, code: String) -> Result<String, String> {
-    browser::execute_js(&app, &code)
+async fn browser_execute_js(app: tauri::AppHandle, code: String) -> Result<String, String> {
+    browser::execute_js(&app, &code).await
 }
 
 #[tauri::command]
@@ -1237,6 +1244,7 @@ fn main() {
             browser_execute_js,
             browser_execute_action,
             browser_send_message,
+            __browser_js_result,
         ])
         .setup(|app| {
             let handle = app.handle().clone();

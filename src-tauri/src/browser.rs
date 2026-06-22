@@ -7,8 +7,9 @@
 // ---------------------------------------------------------------------------
 
 use serde::{Deserialize, Serialize};
-use std::sync::Mutex;
-use tauri::{AppHandle, Emitter, Listener, Manager, WebviewUrl, WebviewWindowBuilder};
+use std::collections::HashMap;
+use std::sync::{LazyLock, Mutex};
+use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 
 // ---------------------------------------------------------------------------
 // Types
@@ -306,7 +307,7 @@ pub fn select_option(app: &AppHandle, selector: &str, value: &str) -> Result<Str
 }
 
 /// Read the current page content (URL, title, visible text).
-pub fn read_page(app: &AppHandle) -> Result<String, String> {
+pub async fn read_page(app: &AppHandle) -> Result<String, String> {
     let js = r#"(function() {
         // Get visible text, limiting to avoid huge payloads
         var body = document.body;
@@ -328,11 +329,11 @@ pub fn read_page(app: &AppHandle) -> Result<String, String> {
             text: text
         });
     })()"#;
-    eval_js(app, js)
+    eval_js_collect(app, js).await
 }
 
 /// Read all links on the page.
-pub fn read_links(app: &AppHandle) -> Result<String, String> {
+pub async fn read_links(app: &AppHandle) -> Result<String, String> {
     let js = r#"(function() {
         var links = [];
         var els = document.querySelectorAll('a[href]');
@@ -344,17 +345,34 @@ pub fn read_links(app: &AppHandle) -> Result<String, String> {
         }
         return JSON.stringify(links);
     })()"#;
-    eval_js(app, js)
+    eval_js_collect(app, js).await
 }
 
 /// Read form fields on the page.
-pub fn read_forms(app: &AppHandle) -> Result<String, String> {
+///
+/// Field *values* are redacted before they leave the device: password and
+/// payment fields, and anything whose name/id/label/autocomplete looks
+/// secret-ish (token, secret, otp, cvv, ssn, card, seed, …), are returned as
+/// `[redacted]`. The agent still sees the field exists (type/name/label/
+/// selector) so it can fill it, but the actual secret value is never shipped to
+/// the model API.
+pub async fn read_forms(app: &AppHandle) -> Result<String, String> {
     let js = r#"(function() {
+        var SECRET_RE = /(pass|secret|token|api[-_ ]?key|otp|2fa|cvv|cvc|ccv|ssn|\bpin\b|card|cardnum|account|routing|iban|seed|mnemonic|private[-_ ]?key|auth|session)/i;
+        var SECRET_AC = /(current-password|new-password|cc-number|cc-csc|cc-exp|one-time-code)/i;
+        function isSecret(el) {
+            var t = (el.type || '').toLowerCase();
+            if (t === 'password') return true;
+            var ac = (el.getAttribute('autocomplete') || '');
+            if (SECRET_AC.test(ac)) return true;
+            var hay = (el.name||'') + ' ' + (el.id||'') + ' ' + (el.getAttribute('aria-label')||'') + ' ' + (el.placeholder||'');
+            return SECRET_RE.test(hay);
+        }
         var fields = [];
         var els = document.querySelectorAll('input, select, textarea');
         for (var i = 0; i < Math.min(els.length, 100); i++) {
             var el = els[i];
-            // Skip hidden fields
+            // Skip hidden fields (may carry CSRF tokens / opaque state)
             if (el.type === 'hidden') continue;
             // Try to find a label
             var label = '';
@@ -371,12 +389,25 @@ pub fn read_forms(app: &AppHandle) -> Result<String, String> {
             else if (el.name) selector += '[name="' + el.name + '"]';
             else selector += ':nth-of-type(' + (Array.from(el.parentElement.children).indexOf(el) + 1) + ')';
 
+            // Redact secret-looking values; otherwise return a truncated value.
+            var rawValue = el.value || '';
+            var value;
+            if (isSecret(el)) {
+                value = rawValue ? '[redacted]' : '';
+            } else if (el.tagName.toLowerCase() === 'textarea') {
+                // Textareas can hold large/sensitive free text — truncate hard.
+                value = rawValue.substring(0, 200);
+            } else {
+                value = rawValue.substring(0, 500);
+            }
+
             fields.push({
                 tag: el.tagName.toLowerCase(),
                 field_type: el.type || el.tagName.toLowerCase(),
                 name: el.name || '',
                 id: el.id || '',
-                value: el.value || '',
+                value: value,
+                redacted: isSecret(el),
                 placeholder: el.placeholder || '',
                 label: label.substring(0, 100),
                 selector: selector
@@ -384,12 +415,17 @@ pub fn read_forms(app: &AppHandle) -> Result<String, String> {
         }
         return JSON.stringify(fields);
     })()"#;
-    eval_js(app, js)
+    eval_js_collect(app, js).await
 }
 
 /// Execute arbitrary JavaScript in the browser window.
-pub fn execute_js(app: &AppHandle, code: &str) -> Result<String, String> {
-    eval_js(app, code)
+///
+/// DANGEROUS: this can read page secrets and drive authenticated sessions. It is
+/// intentionally NOT exposed as an agent action (see tool_definition /
+/// execute_action); it remains only for explicit, user-initiated use via the
+/// `browser_execute_js` command.
+pub async fn execute_js(app: &AppHandle, code: &str) -> Result<String, String> {
+    eval_js_collect(app, code).await
 }
 
 /// Wait for a specified number of milliseconds (non-blocking on Rust side).
@@ -442,9 +478,9 @@ pub async fn execute_action(app: &AppHandle, action: &BrowserAction) -> BrowserA
             let amt = action.amount.unwrap_or(3);
             scroll(app, dir, amt)
         }
-        "read_page" => read_page(app),
-        "read_links" => read_links(app),
-        "read_forms" => read_forms(app),
+        "read_page" => read_page(app).await,
+        "read_links" => read_links(app).await,
+        "read_forms" => read_forms(app).await,
         "select" => {
             let sel = action.selector.as_deref().unwrap_or("select");
             let val = action.value.as_deref().unwrap_or("");
@@ -456,10 +492,11 @@ pub async fn execute_action(app: &AppHandle, action: &BrowserAction) -> BrowserA
             let ms = action.amount.unwrap_or(2000) as u64;
             wait(ms).await.map(|_| format!("Waited {}ms", ms))
         }
-        "execute_js" => {
-            let code = action.text.as_deref().unwrap_or("");
-            execute_js(app, code)
-        }
+        "execute_js" => Err(
+            "execute_js is disabled for the agent for safety. Use the specific \
+             read/click/type actions instead."
+                .to_string(),
+        ),
         _ => Err(format!("Unknown browser action: {}", action_name)),
     };
 
@@ -493,7 +530,7 @@ pub fn tool_definition() -> serde_json::Value {
             "properties": {
                 "action": {
                     "type": "string",
-                    "enum": ["navigate", "click", "type", "scroll", "read_page", "read_links", "read_forms", "select", "back", "forward", "wait", "execute_js"],
+                    "enum": ["navigate", "click", "type", "scroll", "read_page", "read_links", "read_forms", "select", "back", "forward", "wait"],
                     "description": "The browser action to perform"
                 },
                 "url": {
@@ -506,7 +543,7 @@ pub fn tool_definition() -> serde_json::Value {
                 },
                 "text": {
                     "type": "string",
-                    "description": "Text to type (for 'type' action) or JavaScript code (for 'execute_js' action)"
+                    "description": "Text to type (for 'type' action)"
                 },
                 "direction": {
                     "type": "string",
@@ -741,130 +778,82 @@ fn get_window(app: &AppHandle) -> Result<tauri::WebviewWindow, String> {
         .ok_or_else(|| "Browser window not open. Call browser_open first.".to_string())
 }
 
-/// Evaluate JavaScript in the browser window and return the result as a string.
-/// Uses Tauri's `eval()` which injects JS. For return values, we use a
-/// message-passing pattern: the JS writes its result to a Tauri event.
+/// Fire-and-forget JS evaluation for actions (click/type/scroll/select/
+/// navigate) that don't need a return value. Wrapped in try/catch so a page-side
+/// error doesn't surface as an unhandled rejection. Reads that need the actual
+/// value use [`eval_js_collect`] instead.
 fn eval_js(app: &AppHandle, js: &str) -> Result<String, String> {
     let win = get_window(app)?;
-
-    // Tauri v2's eval() doesn't return values directly.
-    // Workaround: wrap JS in a function that POSTs the result back via
-    // window.__TAURI__.event.emit(). The caller collects via channel.
-    //
-    // For simplicity in v1 of this feature, we use eval() fire-and-forget
-    // for actions (click, type, scroll) and return success/failure.
-    // For read operations, we inject JS that calls back via Tauri event.
-
-    // Use a sync approach: inject JS that stores result in a known location,
-    // then read it back. This is simpler and avoids async coordination issues.
-    let wrapper = format!(
-        r#"try {{
-            var __nyx_result = (function() {{ return {js}; }})();
-            if (window.__TAURI_INTERNALS__) {{
-                window.__TAURI_INTERNALS__.invoke('__browser_js_result', {{ result: __nyx_result || 'ok' }});
-            }}
-        }} catch(e) {{
-            if (window.__TAURI_INTERNALS__) {{
-                window.__TAURI_INTERNALS__.invoke('__browser_js_result', {{ result: JSON.stringify({{ error: e.message }}) }});
-            }}
-        }}"#,
-        js = js
-    );
-
+    let wrapper = format!("try {{ (function() {{ return ({js}); }})(); }} catch (e) {{}}");
     win.eval(&wrapper)
         .map_err(|e| format!("JS eval failed: {}", e))?;
-
-    // Since eval() is fire-and-forget in Tauri v2, we return a success indicator.
-    // The actual result will come back via the __browser_js_result command or
-    // the frontend can read it. For the agent loop, we'll use a channel-based
-    // approach in the gateway integration.
-    //
-    // For now, we return a placeholder — the gateway agent loop will use
-    // eval_js_async() below for operations that need return values.
     Ok("ok".to_string())
 }
 
-/// Async JS evaluation that waits for the result via a one-shot channel.
-/// This is used by the agent loop where we need the actual return value.
-#[allow(dead_code)]
-pub async fn eval_js_async(app: &AppHandle, js: &str) -> Result<String, String> {
-    let win = get_window(app)?;
+/// Pending JS-evaluation results, keyed by callback id. The injected JS calls
+/// the registered `__browser_js_result` command with its id + serialized value,
+/// which resolves the matching oneshot via [`resolve_js_result`].
+static PENDING_JS: LazyLock<Mutex<HashMap<String, tokio::sync::oneshot::Sender<String>>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
 
-    // Create a unique callback ID
+/// Resolve a pending [`eval_js_collect`] call. Invoked by the
+/// `__browser_js_result` Tauri command when injected JS posts its result back.
+pub fn resolve_js_result(id: String, result: String) {
+    let sender = PENDING_JS.lock().ok().and_then(|mut m| m.remove(&id));
+    if let Some(tx) = sender {
+        let _ = tx.send(result);
+    }
+}
+
+/// Evaluate JS in the browser window and await its return value.
+///
+/// Tauri v2's `eval()` is fire-and-forget, so we inject a wrapper that serializes
+/// the result and `invoke`s the registered `__browser_js_result` command with a
+/// unique id; the command resolves a oneshot we await here (10s timeout).
+///
+/// This replaces the old behaviour where read tools returned the literal string
+/// `"ok"`. If the round-trip fails it now returns an explicit error/timeout
+/// rather than a value the agent would mistake for page content.
+async fn eval_js_collect(app: &AppHandle, js: &str) -> Result<String, String> {
+    let win = get_window(app)?;
     let cb_id = uuid::Uuid::new_v4().to_string().replace('-', "");
 
-    // We'll use the Tauri event system: inject JS that emits an event with the result
+    let (tx, rx) = tokio::sync::oneshot::channel::<String>();
+    PENDING_JS
+        .lock()
+        .map_err(|_| "PENDING_JS lock poisoned".to_string())?
+        .insert(cb_id.clone(), tx);
+
     let wrapper = format!(
-        r#"(async function() {{
+        r#"(function() {{
+            function __send(payload) {{
+                try {{
+                    window.__TAURI_INTERNALS__.invoke('__browser_js_result', {{ id: '{cb_id}', result: payload }});
+                }} catch (_e) {{}}
+            }}
             try {{
-                var __result = (function() {{ return {js}; }})();
-                // Emit result back to Rust via Tauri event
-                if (window.__TAURI_INTERNALS__) {{
-                    window.__TAURI_INTERNALS__.postMessage(JSON.stringify({{
-                        cmd: 'plugin:event|emit',
-                        event: 'browser:js_result_{cb_id}',
-                        payload: {{ result: typeof __result === 'string' ? __result : JSON.stringify(__result) }}
-                    }}));
-                }}
-            }} catch(e) {{
-                if (window.__TAURI_INTERNALS__) {{
-                    window.__TAURI_INTERNALS__.postMessage(JSON.stringify({{
-                        cmd: 'plugin:event|emit',
-                        event: 'browser:js_result_{cb_id}',
-                        payload: {{ error: e.message }}
-                    }}));
-                }}
+                var __r = (function() {{ return ({js}); }})();
+                __send(typeof __r === 'string' ? __r : JSON.stringify(__r));
+            }} catch (e) {{
+                __send(JSON.stringify({{ error: String((e && e.message) || e) }}));
             }}
         }})()"#,
-        js = js,
-        cb_id = cb_id
+        cb_id = cb_id,
+        js = js
     );
 
-    // Set up a one-shot listener for the result.
-    // Wrap sender in Mutex<Option<>> because Tauri's listen requires Fn (not FnOnce).
-    let (tx, rx) = tokio::sync::oneshot::channel::<String>();
-    let tx = std::sync::Mutex::new(Some(tx));
-    let event_name = format!("browser:js_result_{}", cb_id);
+    if let Err(e) = win.eval(&wrapper) {
+        let _ = PENDING_JS.lock().map(|mut m| m.remove(&cb_id));
+        return Err(format!("JS eval failed: {}", e));
+    }
 
-    let id = app.listen(&event_name, move |event: tauri::Event| {
-        let payload = event.payload().to_string();
-        // Take the sender (only succeeds once)
-        let sender = tx.lock().ok().and_then(|mut guard| guard.take());
-        if let Some(sender) = sender {
-            // Parse the payload to extract the result
-            if let Ok(val) = serde_json::from_str::<serde_json::Value>(&payload) {
-                if let Some(err) = val.get("error").and_then(|v| v.as_str()) {
-                    let _ = sender.send(format!("{{\"error\":\"{}\"}}", err));
-                } else if let Some(result) = val.get("result").and_then(|v| v.as_str()) {
-                    let _ = sender.send(result.to_string());
-                } else {
-                    let _ = sender.send(payload);
-                }
-            } else {
-                let _ = sender.send(payload);
-            }
-        }
-    });
-
-    // Inject the JS
-    win.eval(&wrapper)
-        .map_err(|e| format!("JS eval failed: {}", e))?;
-
-    // Wait for the result with a timeout
     match tokio::time::timeout(std::time::Duration::from_secs(10), rx).await {
-        Ok(Ok(result)) => {
-            app.unlisten(id);
-            Ok(result)
-        }
-        Ok(Err(_)) => {
-            app.unlisten(id);
-            Err("JS result channel closed unexpectedly".to_string())
-        }
+        Ok(Ok(result)) => Ok(result),
+        Ok(Err(_)) => Err("JS result channel closed unexpectedly".to_string()),
         Err(_) => {
-            app.unlisten(id);
-            // Timeout is not necessarily an error — some actions (click, scroll)
-            // don't produce a meaningful return value
-            Ok("ok (timeout — action likely completed)".to_string())
+            // Clean up the orphaned pending entry on timeout.
+            let _ = PENDING_JS.lock().map(|mut m| m.remove(&cb_id));
+            Err("Timed out waiting for JS result from the browser window".to_string())
         }
     }
 }
