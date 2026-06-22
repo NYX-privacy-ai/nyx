@@ -2,6 +2,7 @@
 // nyx_lib — shared modules used by both the Tauri GUI and the MCP server
 // ---------------------------------------------------------------------------
 
+pub mod audit;
 pub mod config;
 pub mod docker;
 pub mod gateway;
