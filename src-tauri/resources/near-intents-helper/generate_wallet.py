@@ -45,7 +45,7 @@ def main():
     parser = argparse.ArgumentParser(description="Generate NEAR implicit account")
     parser.add_argument(
         "--output",
-        default=str(Path.home() / ".openclaw" / "secrets" / "near_account.json"),
+        default=str(Path.home() / ".nyx" / "secrets" / "near_account.json"),
         help="Output path for account JSON",
     )
     args = parser.parse_args()

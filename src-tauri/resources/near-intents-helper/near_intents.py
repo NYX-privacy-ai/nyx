@@ -28,10 +28,10 @@ from dotenv import load_dotenv
 # ---------------------------------------------------------------------------
 # Paths
 # ---------------------------------------------------------------------------
-SECRETS_DIR = Path.home() / ".openclaw" / "secrets"
+SECRETS_DIR = Path.home() / ".nyx" / "secrets"
 ENV_FILE = SECRETS_DIR / "near_intents.env"
 ACCOUNT_FILE = SECRETS_DIR / "near_account.json"
-LOG_DIR = Path.home() / ".openclaw" / "defi-state" / "logs"
+LOG_DIR = Path.home() / ".nyx" / "defi-state" / "logs"
 AUDIT_LOG = LOG_DIR / "audit.jsonl"
 
 # ---------------------------------------------------------------------------

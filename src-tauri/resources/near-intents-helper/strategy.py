@@ -30,8 +30,8 @@ from burrow import Burrow
 from yield_engine import YieldEngine
 from guardrails import Guardrails, GuardrailViolation
 
-SECRETS_DIR = Path.home() / ".openclaw" / "secrets"
-STATE_DIR = Path.home() / ".openclaw" / "defi-state"
+SECRETS_DIR = Path.home() / ".nyx" / "secrets"
+STATE_DIR = Path.home() / ".nyx" / "defi-state"
 
 
 def _die(msg: str):

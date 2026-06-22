@@ -167,7 +167,7 @@ def _load_account():
     if env_key and env_account:
         return env_account, _parse_near_key(env_key)
 
-    secrets_dir = Path.home() / ".openclaw" / "secrets"
+    secrets_dir = Path.home() / ".nyx" / "secrets"
     account_file = secrets_dir / "near_account.json"
     if not account_file.exists():
         print(json.dumps({"status": "error", "message": f"Account file not found: {account_file}"}), file=sys.stderr)
