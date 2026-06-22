@@ -67,6 +67,8 @@ async fn run_setup(
 }
 
 /// Extended setup command that accepts the full v2 configuration.
+// Many fields by nature — this is the wizard's full config payload.
+#[allow(clippy::too_many_arguments)]
 #[tauri::command]
 async fn run_setup_v2(
     app_handle: tauri::AppHandle,

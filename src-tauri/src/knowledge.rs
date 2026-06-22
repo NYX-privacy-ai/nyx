@@ -378,11 +378,9 @@ pub fn get_knowledge_stats() -> Result<KnowledgeStats, String> {
     let tag_rows = tag_stmt
         .query_map([], |r| r.get::<_, String>(0))
         .map_err(|e| e.to_string())?;
-    for row in tag_rows {
-        if let Ok(tags_str) = row {
-            for tag in parse_json_array(&tags_str) {
-                *tag_counts.entry(tag).or_insert(0u32) += 1;
-            }
+    for tags_str in tag_rows.flatten() {
+        for tag in parse_json_array(&tags_str) {
+            *tag_counts.entry(tag).or_insert(0u32) += 1;
         }
     }
     let mut top_tags: Vec<TagCount> = tag_counts

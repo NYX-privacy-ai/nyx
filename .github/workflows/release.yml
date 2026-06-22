@@ -9,7 +9,36 @@ permissions:
   contents: write
 
 jobs:
+  quality:
+    name: Quality gate (fmt, clippy, tests, binaries)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - name: Format check
+        working-directory: src-tauri
+        run: cargo fmt --check
+      - name: Clippy (deny warnings)
+        working-directory: src-tauri
+        run: cargo clippy --lib --bins -- -D warnings
+      - name: Tests
+        working-directory: src-tauri
+        run: cargo test --lib --bins --tests
+      - name: Python guardrail tests
+        working-directory: src-tauri/resources/near-intents-helper
+        run: python3 -m unittest discover -p 'test_*.py'
+      - name: Verify vendored binaries
+        run: ./scripts/verify-binaries.sh
+
   build-macos:
+    needs: quality
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4

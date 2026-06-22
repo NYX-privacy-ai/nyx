@@ -370,7 +370,7 @@ fn days_to_ymd(mut total_days: u64) -> (u64, u64, u64) {
 }
 
 fn is_leap(y: u64) -> bool {
-    (y % 4 == 0 && y % 100 != 0) || y % 400 == 0
+    (y.is_multiple_of(4) && !y.is_multiple_of(100)) || y.is_multiple_of(400)
 }
 
 /// Returns ISO date string for N days ago (YYYY-MM-DD).
@@ -558,11 +558,9 @@ pub fn observe_email() -> Result<u32, String> {
     let threads: Vec<GogGmailThread> =
         if let Ok(resp) = serde_json::from_str::<GogGmailSearchResponse>(&stdout) {
             resp.threads.unwrap_or_default()
-        } else if let Ok(arr) = serde_json::from_str::<Vec<GogGmailThread>>(&stdout) {
-            arr
         } else {
-            // Might be empty result
-            Vec::new()
+            // Might be a direct array, or an empty/unparseable result.
+            serde_json::from_str::<Vec<GogGmailThread>>(&stdout).unwrap_or_default()
         };
 
     let conn = open_db()?;
@@ -626,14 +624,14 @@ pub fn observe_email() -> Result<u32, String> {
 
                 let is_inbound = if from_email.is_empty() {
                     None
-                } else if let Some(ref user) = user_email {
-                    Some(if from_email.to_lowercase() != user.to_lowercase() {
-                        1
-                    } else {
-                        0
-                    })
                 } else {
-                    None
+                    user_email.as_ref().map(|user| {
+                        if from_email.to_lowercase() != user.to_lowercase() {
+                            1
+                        } else {
+                            0
+                        }
+                    })
                 };
 
                 let labels_json = msg

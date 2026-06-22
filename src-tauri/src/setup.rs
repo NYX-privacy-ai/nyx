@@ -123,6 +123,8 @@ pub async fn run_setup(
 
 /// Extended setup that accepts the full v2 configuration from the setup wizard.
 /// Wallets are passed in directly (already generated/imported by the UI).
+// Many fields by nature — this mirrors the wizard's full config payload.
+#[allow(clippy::too_many_arguments)]
 pub async fn run_setup_v2(
     app_handle: tauri::AppHandle,
     agent_name: String,
