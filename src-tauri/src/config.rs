@@ -223,7 +223,7 @@ impl Default for ChannelConfig {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct MessagingConfig {
     pub gmail: ChannelConfig,
     pub whatsapp: ChannelConfig,
@@ -231,18 +231,6 @@ pub struct MessagingConfig {
     pub slack: ChannelConfig,
     #[serde(default)]
     pub signal: ChannelConfig,
-}
-
-impl Default for MessagingConfig {
-    fn default() -> Self {
-        MessagingConfig {
-            gmail: ChannelConfig::default(),
-            whatsapp: ChannelConfig::default(),
-            telegram: ChannelConfig::default(),
-            slack: ChannelConfig::default(),
-            signal: ChannelConfig::default(),
-        }
-    }
 }
 
 // ---------------------------------------------------------------------------
@@ -462,7 +450,7 @@ pub fn read_current_config() -> Result<SettingsConfig, String> {
     };
 
     // Key presence (never expose actual values)
-    let has_key = |k: &str| env.get(k).map_or(false, |v| !v.is_empty());
+    let has_key = |k: &str| env.get(k).is_some_and(|v| !v.is_empty());
 
     // Default LLM provider
     let default_llm_provider = env
@@ -489,9 +477,7 @@ pub fn read_current_config() -> Result<SettingsConfig, String> {
             .get("MAX_DAILY_TXS")
             .and_then(|v| v.parse().ok())
             .unwrap_or(20),
-        require_confirmation: env
-            .get("REQUIRE_CONFIRMATION")
-            .map_or(false, |v| v == "true"),
+        require_confirmation: env.get("REQUIRE_CONFIRMATION").is_some_and(|v| v == "true"),
         max_slippage_percent: env
             .get("MAX_SLIPPAGE_PCT")
             .and_then(|v| v.parse().ok())
@@ -507,7 +493,7 @@ pub fn read_current_config() -> Result<SettingsConfig, String> {
     };
 
     // Messaging
-    let parse_bool = |k: &str| env.get(k).map_or(false, |v| v == "true");
+    let parse_bool = |k: &str| env.get(k).is_some_and(|v| v == "true");
 
     let parse_autonomy = |k: &str| -> MessagingAutonomy {
         match env.get(k).map(|s| s.as_str()) {
@@ -824,7 +810,7 @@ pub fn save_settings(update: SettingsUpdate) -> Result<SettingsSaveResult, Strin
             has_private_key: true,
             is_active: env
                 .get(&format!("WALLET_{}_ACTIVE", i))
-                .map_or(false, |v| v == "true"),
+                .is_some_and(|v| v == "true"),
         });
     }
     let active_wallet_id = env.get("ACTIVE_WALLET_ID").cloned();

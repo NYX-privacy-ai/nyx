@@ -1,0 +1,7 @@
+# SHA-256 checksums for vendored third-party binaries (verified by
+# scripts/verify-binaries.sh and the CI "binaries" job). Update this file
+# whenever a vendored binary is intentionally replaced. nyx-mcp is built from
+# source in the release workflow and is therefore not listed here.
+0bbe619e663e0de2c550be2fe0d240d076799d6f8a652b70fa04aea8a8362e8a  src-tauri/resources/bin/jq
+011a66fc2701d74a9009ce0b5c022f2360872326a138531c3ff674a1837f5738  src-tauri/resources/bin/gog
+c28743178773a8d65ae6b99452d84a994868da7766ff9a8290ef271573dd2009  src-tauri/resources/bin/gog-linux-arm64

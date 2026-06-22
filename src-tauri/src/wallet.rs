@@ -81,12 +81,10 @@ pub fn validate_address(chain: &Chain, address: &str) -> Result<(), String> {
 
 fn validate_near_address(address: &str) -> Result<(), String> {
     // Named accounts: *.near or *.testnet
-    if address.ends_with(".near") || address.ends_with(".testnet") {
-        let prefix = if address.ends_with(".near") {
-            &address[..address.len() - 5]
-        } else {
-            &address[..address.len() - 8]
-        };
+    if let Some(prefix) = address
+        .strip_suffix(".near")
+        .or_else(|| address.strip_suffix(".testnet"))
+    {
         if prefix.is_empty() {
             return Err("NEAR named account has empty prefix".to_string());
         }
@@ -136,7 +134,7 @@ fn validate_sol_address(address: &str) -> Result<(), String> {
 
 fn validate_btc_address(address: &str) -> Result<(), String> {
     let len = address.len();
-    if len < 25 || len > 62 {
+    if !(25..=62).contains(&len) {
         return Err(format!("BTC address must be 25-62 characters, got {}", len));
     }
     if !(address.starts_with('1')
@@ -170,7 +168,7 @@ fn validate_zec_address(address: &str) -> Result<(), String> {
     // Shielded Sapling addresses: zs1...
     if address.starts_with("zs1") {
         // Sapling addresses are Bech32-encoded, typically 78 chars
-        if len < 70 || len > 90 {
+        if !(70..=90).contains(&len) {
             return Err(format!(
                 "ZEC shielded (Sapling) address should be ~78 characters, got {}",
                 len

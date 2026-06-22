@@ -19,7 +19,14 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Optional
 
-from dotenv import load_dotenv
+try:
+    from dotenv import load_dotenv
+except ImportError:
+    # python-dotenv is optional: if it isn't installed we simply rely on the
+    # process environment (env vars are still read below). This keeps the
+    # safety-critical guardrail logic importable/testable without the dep.
+    def load_dotenv(*_args, **_kwargs):
+        return False
 
 
 # ------------------------------------------------------------------

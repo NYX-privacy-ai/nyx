@@ -1,0 +1,70 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  rust:
+    name: Rust (fmt, clippy, test)
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: src-tauri
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - name: Format check
+        run: cargo fmt --check
+      - name: Clippy (deny warnings)
+        run: cargo clippy --lib --bins -- -D warnings
+      - name: Tests
+        run: cargo test --lib --bins --tests
+
+  frontend:
+    name: Frontend (build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - run: npm ci
+      - name: Build
+        run: npm run build
+      - name: Dependency audit (informational)
+        # Non-blocking: the remaining advisories are dev/build-time and the
+        # available fix requires a breaking vite/kit upgrade tracked separately.
+        run: npm audit --audit-level=high || true
+
+  python:
+    name: Python (guardrail tests)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Guardrail tests
+        working-directory: src-tauri/resources/near-intents-helper
+        run: python -m unittest discover -p 'test_*.py' -v
+
+  binaries:
+    name: Bundled binary verification
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify checksums + architectures
+        run: ./scripts/verify-binaries.sh
