@@ -85,10 +85,11 @@ pub async fn run_setup(
         capabilities: config::CapabilitiesConfig::default(),
     };
 
-    config::write_nyx_env(&setup_config)?;
-    config::write_ironclaw_config(&setup_config)?;
-    config::write_guardrails(&guardrails)?;
-    config::write_cron_jobs(&setup_config)?;
+    config::write_nyx_env(&setup_config).map_err(|e| format!("[write .env] {}", e))?;
+    config::write_ironclaw_config(&setup_config)
+        .map_err(|e| format!("[write config.toml] {}", e))?;
+    config::write_guardrails(&guardrails).map_err(|e| format!("[write guardrails] {}", e))?;
+    config::write_cron_jobs(&setup_config).map_err(|e| format!("[write cron jobs] {}", e))?;
 
     // Step 4: Write empty function call keys
     let keys_path = nyx_dir.join("secrets/function_call_keys.json");
@@ -101,8 +102,9 @@ pub async fn run_setup(
     }
 
     // Step 5: Copy bundled resources (resolved via Tauri at runtime)
-    let resources_dir = resolve_resources_dir(&app_handle)?;
-    config::copy_resources(&resources_dir)?;
+    let resources_dir =
+        resolve_resources_dir(&app_handle).map_err(|e| format!("[resolve resources] {}", e))?;
+    config::copy_resources(&resources_dir).map_err(|e| format!("[copy resources] {}", e))?;
 
     // Step 6: Write daemon wrapper script
     write_daemon_script()?;
@@ -145,8 +147,11 @@ pub async fn run_setup_v2(
     let gateway_token = config::generate_token();
     let nyx_dir = ironclaw::config_dir();
 
+    // Each step prefixes its error with a stage label so the UI can show
+    // exactly which part of setup failed (Docker/config/resources/daemon) and
+    // offer a precise recovery action instead of a generic "Setup Failed".
     // Step 1: Create directory structure
-    config::create_directories()?;
+    config::create_directories().map_err(|e| format!("[create directories] {}", e))?;
 
     // Step 2: Write config files
     let active_id = active_wallet_id.or_else(|| wallets.first().map(|w| w.id.clone()));
@@ -171,10 +176,11 @@ pub async fn run_setup_v2(
         capabilities,
     };
 
-    config::write_nyx_env(&setup_config)?;
-    config::write_ironclaw_config(&setup_config)?;
-    config::write_guardrails(&guardrails)?;
-    config::write_cron_jobs(&setup_config)?;
+    config::write_nyx_env(&setup_config).map_err(|e| format!("[write .env] {}", e))?;
+    config::write_ironclaw_config(&setup_config)
+        .map_err(|e| format!("[write config.toml] {}", e))?;
+    config::write_guardrails(&guardrails).map_err(|e| format!("[write guardrails] {}", e))?;
+    config::write_cron_jobs(&setup_config).map_err(|e| format!("[write cron jobs] {}", e))?;
 
     // Step 3: Write empty function call keys
     let keys_path = nyx_dir.join("secrets/function_call_keys.json");
@@ -187,8 +193,9 @@ pub async fn run_setup_v2(
     }
 
     // Step 4: Copy bundled resources
-    let resources_dir = resolve_resources_dir(&app_handle)?;
-    config::copy_resources(&resources_dir)?;
+    let resources_dir =
+        resolve_resources_dir(&app_handle).map_err(|e| format!("[resolve resources] {}", e))?;
+    config::copy_resources(&resources_dir).map_err(|e| format!("[copy resources] {}", e))?;
 
     // Step 4b: Personalize SOUL.md with the configured agent name
     let soul_path = nyx_dir.join("workspace/SOUL.md");
@@ -207,7 +214,9 @@ pub async fn run_setup_v2(
     write_launch_agent()?;
 
     // Step 7: Start IronClaw daemon
-    ironclaw::start_daemon().await?;
+    ironclaw::start_daemon()
+        .await
+        .map_err(|e| format!("[start daemon] {}", e))?;
 
     // Return the active wallet address as confirmation
     let active_address = setup_config

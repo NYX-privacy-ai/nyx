@@ -987,6 +987,13 @@ pub fn create_directories() -> Result<(), String> {
 // ---------------------------------------------------------------------------
 
 /// Generate .env from config.
+/// Strip CR/LF from a value before writing it to a `KEY=value` line in `.env`.
+/// A newline in a user-supplied key/token/label would otherwise inject
+/// arbitrary extra environment lines into the file.
+fn env_safe(value: &str) -> String {
+    value.replace(['\r', '\n'], "")
+}
+
 pub fn write_nyx_env(config: &SetupConfig) -> Result<(), String> {
     let home = home_dir();
     let path = home.join(".nyx/.env");
@@ -1015,28 +1022,28 @@ pub fn write_nyx_env(config: &SetupConfig) -> Result<(), String> {
          LIBSQL_PATH={}/.nyx/ironclaw.db\n\
          GATEWAY_PORT={}\n",
         config.gateway_token,
-        config.anthropic_key,
+        env_safe(&config.anthropic_key),
         home.display(),
         gateway_port
     );
 
     if let Some(ref key) = config.openai_key {
-        content.push_str(&format!("OPENAI_API_KEY={}\n", key));
+        content.push_str(&format!("OPENAI_API_KEY={}\n", env_safe(key)));
     }
     if let Some(ref key) = config.venice_key {
-        content.push_str(&format!("VENICE_API_KEY={}\n", key));
+        content.push_str(&format!("VENICE_API_KEY={}\n", env_safe(key)));
     }
     if let Some(ref key) = config.nearai_key {
-        content.push_str(&format!("NEARAI_API_KEY={}\n", key));
+        content.push_str(&format!("NEARAI_API_KEY={}\n", env_safe(key)));
     }
     if let Some(ref key) = config.perplexity_key {
-        content.push_str(&format!("PERPLEXITY_API_KEY={}\n", key));
+        content.push_str(&format!("PERPLEXITY_API_KEY={}\n", env_safe(key)));
     }
     if let Some(ref token) = config.telegram_token {
-        content.push_str(&format!("TELEGRAM_BOT_TOKEN={}\n", token));
+        content.push_str(&format!("TELEGRAM_BOT_TOKEN={}\n", env_safe(token)));
     }
     if let Some(ref token) = config.slack_token {
-        content.push_str(&format!("SLACK_BOT_TOKEN={}\n", token));
+        content.push_str(&format!("SLACK_BOT_TOKEN={}\n", env_safe(token)));
     }
 
     // Wallet credentials — injected at container boundary, never mounted as files
@@ -1047,7 +1054,7 @@ pub fn write_nyx_env(config: &SetupConfig) -> Result<(), String> {
     for (i, w) in config.wallets.iter().enumerate() {
         content.push_str(&format!("WALLET_{}_CHAIN={}\n", i, w.chain));
         content.push_str(&format!("WALLET_{}_ADDRESS={}\n", i, w.address));
-        content.push_str(&format!("WALLET_{}_LABEL={}\n", i, w.label));
+        content.push_str(&format!("WALLET_{}_LABEL={}\n", i, env_safe(&w.label)));
         content.push_str(&format!("WALLET_{}_ACTIVE={}\n", i, w.is_active));
     }
     if let Some(ref active_id) = config.active_wallet_id {
@@ -1196,6 +1203,9 @@ pub fn write_ironclaw_config(config: &SetupConfig) -> Result<(), String> {
 
 onboard_completed = true
 selected_model = "{model}"
+# NOTE: the agent name below is the only user-controlled value in this file.
+# It is serialized through the `toml` crate (see {name} interpolation) so quotes,
+# backslashes and newlines are escaped and cannot break or inject TOML.
 
 [embeddings]
 enabled = false
@@ -1216,7 +1226,7 @@ enabled = false
 interval_secs = 1800
 
 [agent]
-name = "{name}"
+name = {name}
 max_parallel_jobs = 3
 job_timeout_secs = 3600
 stuck_threshold_secs = 300
@@ -1247,7 +1257,9 @@ dedup_threshold = 0.85
 "#,
         model = default_model,
         port = gateway_port,
-        name = config.agent_name,
+        // Serialize through the toml crate so the user-supplied name is a
+        // properly-escaped TOML string literal (includes the surrounding quotes).
+        name = toml::Value::String(config.agent_name.clone()),
     );
 
     if let Some(parent) = path.parent() {

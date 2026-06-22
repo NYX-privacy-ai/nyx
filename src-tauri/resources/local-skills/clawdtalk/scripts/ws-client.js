@@ -40,8 +40,12 @@ const TRANSCRIPT_DEBOUNCE_MS = 300;
 const MAX_TOOL_LOOPS = 10;
 const TOOL_TIMEOUT_MS = 30000;
 
-// Gateway config paths
+// Gateway config paths. Nyx writes its config under ~/.nyx, so that is checked
+// first; the legacy .clawdbot/.openclaw (and Docker /home/node) locations remain
+// as fallbacks for older installs.
 const CLAWDBOT_CONFIG_PATHS = [
+  path.join(process.env.HOME || '/home/node', '.nyx', 'clawdbot.json'),
+  path.join(process.env.HOME || '/home/node', '.nyx', 'config.json'),
   path.join(process.env.HOME || '/home/node', '.clawdbot', 'clawdbot.json'),
   path.join(process.env.HOME || '/home/node', '.openclaw', 'openclaw.json'),
   '/home/node/.clawdbot/clawdbot.json',

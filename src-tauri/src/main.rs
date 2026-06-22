@@ -586,19 +586,20 @@ fn get_agent_name() -> Result<String, String> {
         Ok(c) => c,
         Err(_) => return Ok("Nyx".to_string()),
     };
-    // Simple TOML parsing — look for agent.name
-    for line in content.lines() {
-        let trimmed = line.trim();
-        if trimmed.starts_with("name") && trimmed.contains('=') {
-            if let Some(val) = trimmed.split('=').nth(1) {
-                let name = val.trim().trim_matches('"').to_string();
-                if !name.is_empty() {
-                    return Ok(name);
-                }
-            }
-        }
-    }
-    Ok("Nyx".to_string())
+    // Parse the TOML properly and read [agent].name. The previous line-scan
+    // matched any key starting with "name", split on the first '=' (truncating
+    // values containing '='), and ignored table scoping.
+    let name = toml::from_str::<toml::Value>(&content)
+        .ok()
+        .and_then(|v| {
+            v.get("agent")
+                .and_then(|a| a.get("name"))
+                .and_then(|n| n.as_str())
+                .map(|s| s.to_string())
+        })
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| "Nyx".to_string());
+    Ok(name)
 }
 
 // ---------------------------------------------------------------------------
@@ -845,51 +846,13 @@ fn clawdtalk_status() -> Result<clawdtalk::ClawdTalkStatus, String> {
 
 #[tauri::command]
 fn clawdtalk_configure(api_key: String) -> Result<(), String> {
-    // Store the raw API key in .env
-    let env_path = ironclaw::config_dir().join(".env");
-
-    // Read existing .env
-    let content = std::fs::read_to_string(&env_path).unwrap_or_default();
-
-    // Check if CLAWDTALK_API_KEY already exists
-    let has_key = content
-        .lines()
-        .any(|l| l.trim().starts_with("CLAWDTALK_API_KEY="));
-
-    let updated = if has_key {
-        content
-            .lines()
-            .map(|l| {
-                if l.trim().starts_with("CLAWDTALK_API_KEY=") {
-                    format!("CLAWDTALK_API_KEY={}", api_key)
-                } else {
-                    l.to_string()
-                }
-            })
-            .collect::<Vec<_>>()
-            .join("\n")
-    } else {
-        format!(
-            "{}\n# ClawdTalk Voice\nCLAWDTALK_API_KEY={}\n",
-            content.trim_end(),
-            api_key
-        )
-    };
-
-    std::fs::write(&env_path, updated).map_err(|e| format!("Failed to update .env: {}", e))?;
-
-    // chmod 600
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        let _ = std::fs::set_permissions(&env_path, std::fs::Permissions::from_mode(0o600));
-    }
-
-    // Get agent name for config
+    // Single source of truth: the key lives only in skill-config.json (written
+    // chmod 600 by write_config), which is what both the shell scripts (via jq)
+    // and ws-client.js actually read. It is intentionally NOT also copied into
+    // .env — nothing reads CLAWDTALK_API_KEY from there, so a second plaintext
+    // copy of the secret was pure extra exposure. Any legacy .env entry is
+    // cleaned up by clawdtalk_disable.
     let agent_name = get_agent_name().ok();
-
-    // Write skill-config.json with actual API key (shell scripts use jq to
-    // read this file and cannot resolve ${ENV_VAR} references)
     clawdtalk::write_config(
         &api_key,
         None, // Owner name auto-detected at runtime

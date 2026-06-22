@@ -92,6 +92,42 @@ pub fn init_tables(conn: &Connection) -> Result<(), String> {
 }
 
 // ---------------------------------------------------------------------------
+// Validation
+// ---------------------------------------------------------------------------
+
+const VALID_STATUSES: &[&str] = &["pending", "in_progress", "completed", "cancelled"];
+const VALID_PRIORITIES: &[&str] = &["urgent", "high", "normal", "low"];
+const VALID_SOURCES: &[&str] = &["manual", "suggestion", "email", "calendar", "chat"];
+
+fn validate_one_of(field: &str, value: &str, allowed: &[&str]) -> Result<(), String> {
+    if allowed.contains(&value) {
+        Ok(())
+    } else {
+        Err(format!(
+            "invalid {}: '{}' (allowed: {})",
+            field,
+            value,
+            allowed.join(", ")
+        ))
+    }
+}
+
+/// Accept an ISO date (`YYYY-MM-DD`) or an RFC3339 datetime — the formats the
+/// stats queries assume when comparing `due_date` lexically.
+fn validate_due_date(value: &str) -> Result<(), String> {
+    if chrono::NaiveDate::parse_from_str(value, "%Y-%m-%d").is_ok()
+        || chrono::DateTime::parse_from_rfc3339(value).is_ok()
+    {
+        Ok(())
+    } else {
+        Err(format!(
+            "invalid due_date: '{}' (expected YYYY-MM-DD or RFC3339)",
+            value
+        ))
+    }
+}
+
+// ---------------------------------------------------------------------------
 // CRUD operations
 // ---------------------------------------------------------------------------
 
@@ -148,6 +184,12 @@ pub fn create_task(input: CreateTaskInput) -> Result<Task, String> {
     let priority = input.priority.unwrap_or_else(|| "normal".to_string());
     let source = input.source.unwrap_or_else(|| "manual".to_string());
 
+    validate_one_of("priority", &priority, VALID_PRIORITIES)?;
+    validate_one_of("source", &source, VALID_SOURCES)?;
+    if let Some(ref d) = input.due_date {
+        validate_due_date(d)?;
+    }
+
     conn.execute(
         "INSERT INTO tasks (title, description, priority, category, due_date, source, source_ref, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
         params![input.title, input.description, priority, input.category, input.due_date, source, input.source_ref, now, now],
@@ -173,6 +215,17 @@ pub fn create_task(input: CreateTaskInput) -> Result<Task, String> {
 pub fn update_task(id: i64, input: UpdateTaskInput) -> Result<Task, String> {
     let conn = intelligence::open_db_pub()?;
     let now = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
+
+    // Validate any provided enum/date fields before touching the DB.
+    if let Some(ref s) = input.status {
+        validate_one_of("status", s, VALID_STATUSES)?;
+    }
+    if let Some(ref p) = input.priority {
+        validate_one_of("priority", p, VALID_PRIORITIES)?;
+    }
+    if let Some(ref d) = input.due_date {
+        validate_due_date(d)?;
+    }
 
     // Build dynamic update
     let mut sets = vec!["updated_at = ?1".to_string()];
@@ -217,21 +270,29 @@ pub fn update_task(id: i64, input: UpdateTaskInput) -> Result<Task, String> {
 
     let params_refs: Vec<&dyn rusqlite::types::ToSql> =
         params_vec.iter().map(|p| p.as_ref()).collect();
-    conn.execute(&query, params_refs.as_slice())
+    let affected = conn
+        .execute(&query, params_refs.as_slice())
         .map_err(|e| e.to_string())?;
+    if affected == 0 {
+        return Err(format!("Task {} not found", id));
+    }
 
     // Return updated task
     let tasks = list_tasks(None, None)?;
     tasks
         .into_iter()
         .find(|t| t.id == id)
-        .ok_or_else(|| "Task not found".to_string())
+        .ok_or_else(|| format!("Task {} not found", id))
 }
 
 pub fn delete_task(id: i64) -> Result<(), String> {
     let conn = intelligence::open_db_pub()?;
-    conn.execute("DELETE FROM tasks WHERE id = ?1", params![id])
+    let affected = conn
+        .execute("DELETE FROM tasks WHERE id = ?1", params![id])
         .map_err(|e| e.to_string())?;
+    if affected == 0 {
+        return Err(format!("Task {} not found", id));
+    }
     Ok(())
 }
 
@@ -282,4 +343,28 @@ pub fn get_task_stats() -> Result<TaskStats, String> {
         completed_today,
         overdue,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn validates_enum_membership() {
+        assert!(validate_one_of("priority", "high", VALID_PRIORITIES).is_ok());
+        assert!(validate_one_of("priority", "URGENT", VALID_PRIORITIES).is_err());
+        assert!(validate_one_of("status", "in_progress", VALID_STATUSES).is_ok());
+        assert!(validate_one_of("status", "done", VALID_STATUSES).is_err());
+        assert!(validate_one_of("source", "calendar", VALID_SOURCES).is_ok());
+        assert!(validate_one_of("source", "sms", VALID_SOURCES).is_err());
+    }
+
+    #[test]
+    fn validates_due_date_formats() {
+        assert!(validate_due_date("2026-06-22").is_ok());
+        assert!(validate_due_date("2026-06-22T09:30:00Z").is_ok());
+        assert!(validate_due_date("next tuesday").is_err());
+        assert!(validate_due_date("2026-13-99").is_err());
+        assert!(validate_due_date("").is_err());
+    }
 }
