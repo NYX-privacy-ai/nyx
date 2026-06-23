@@ -27,7 +27,7 @@
       "iconAsTemplate": true
     },
     "security": {
-      "csp": "default-src 'self'; script-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https: asset: http://asset.localhost; font-src 'self' data:; connect-src 'self' ipc: http://ipc.localhost http://localhost:* http://127.0.0.1:* ws://localhost:* ws://127.0.0.1:* https://api.anthropic.com https://api.openai.com https://api.venice.ai https://api.perplexity.ai https://api.near.ai https://*.near.org https://clawdtalk.com https://github.com https://*.githubusercontent.com"
+      "csp": "default-src 'self'; script-src 'self' 'unsafe-inline'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https: asset: http://asset.localhost; font-src 'self' data:; connect-src 'self' ipc: http://ipc.localhost http://localhost:* http://127.0.0.1:* ws://localhost:* ws://127.0.0.1:* https://api.anthropic.com https://api.openai.com https://api.venice.ai https://api.perplexity.ai https://api.near.ai https://*.near.org https://clawdtalk.com https://github.com https://*.githubusercontent.com"
     }
   },
   "plugins": {

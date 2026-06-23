@@ -8,7 +8,7 @@
   let positions = $state<{asset: string, protocol: string, type: string, amount: string, value: string, apy: string}[]>([]);
   let allocation = $state<{asset: string, pct: number, color: string}[]>([]);
   let activity = $state<{time: string, action: string, protocol: string, hash: string}[]>([]);
-  let health = $state<{burrowHealthFactor: number, guardrailsActive: boolean, dailyLoss: number, dailyLossLimit: number} | null>(null);
+  let health = $state<{burrowHealthFactor: number | null, guardrailsActive: boolean, dailyLoss: number, dailyLossLimit: number} | null>(null);
 
   // Activity Intelligence
   let intelligenceEnabled = $state(false);
@@ -120,7 +120,16 @@
         }));
         allocation = data.allocation ?? [];
         activity = data.activity ?? [];
-        health = data.health ?? null;
+        // Map the Rust HealthStatus (snake_case, burrow_health_factor is
+        // Option<f64> -> may be null) into the shape the template expects.
+        // Reading data.health.burrowHealthFactor directly was undefined and
+        // crashed render with `.toFixed` of undefined.
+        health = data.health ? {
+          burrowHealthFactor: data.health.burrow_health_factor ?? null,
+          guardrailsActive: data.health.guardrails_active ?? false,
+          dailyLoss: data.health.daily_loss_pct ?? 0,
+          dailyLossLimit: data.health.daily_loss_limit_pct ?? 0,
+        } : null;
       }
     } catch {
       // Portfolio not available (daemon not running or no data yet)
@@ -186,7 +195,7 @@
       <section class="flex gap-8 mb-10">
         <div class="flex items-center gap-2">
           <div class="w-2 h-2 rounded-full bg-positive"></div>
-          <span class="text-ivory-muted text-xs tracking-wide">Health Factor {health.burrowHealthFactor.toFixed(2)}</span>
+          <span class="text-ivory-muted text-xs tracking-wide">Health Factor {health.burrowHealthFactor != null ? health.burrowHealthFactor.toFixed(2) : '—'}</span>
         </div>
         <div class="flex items-center gap-2">
           <div class="w-2 h-2 rounded-full bg-positive"></div>
